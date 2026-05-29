@@ -1,0 +1,109 @@
+/* Global Reset & Base Styles — Premium Light Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* ── Premium Light Theme (White & Deep Slate) ── */
+  --bg-main: #FFFFFF;          /* Pure white background */
+  --bg-surface: #F8FAFC;       /* Slate 50 — clean light surface */
+  --bg-surface-hover: #F1F5F9; /* Slate 100 — hover state */
+  --bg-card: rgba(248, 250, 252, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.75);
+
+  --text-primary: #0F172A;     /* Slate 900 — crisp slate-black for high contrast readability */
+  --text-secondary: #475569;   /* Slate 600 — elegant secondary text */
+  --text-tertiary: #64748B;    /* Slate 500 — clear auxiliary text */
+
+  /* Dark Slate & Silver Accents */
+  --accent-primary: #0F172A;       /* Deep slate-black */
+  --accent-primary-hover: #1E293B; /* Slightly lighter deep slate */
+  --accent-secondary: #334155;     /* Slate 700 */
+  --accent-glow: rgba(15, 23, 42, 0.05);
+
+  /* Status Colors */
+  --status-todo: #EF4444;     /* Crisp Red */
+  --status-progress: #F59E0B; /* Crisp Amber */
+  --status-done: #10B981;     /* Crisp Emerald */
+
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --danger-bg: rgba(220, 38, 38, 0.05);
+  --danger-border: rgba(220, 38, 38, 0.15);
+
+  /* Precise Borders & Glass Outlines */
+  --border-light: rgba(15, 23, 42, 0.06);
+  --border-glass: rgba(15, 23, 42, 0.08);
+  --border-focus: rgba(15, 23, 42, 0.25);
+
+  /* Radius Grid */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
+
+  /* Premium Elevation & Soft Shadows */
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 30px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.08);
+  --shadow-glass: 0 8px 32px 0 rgba(15, 23, 42, 0.06);
+  --shadow-glow: 0 0 30px var(--accent-glow);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+button {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+input, textarea, select {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Ultra-Thin Modern Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.1);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.2);
+}

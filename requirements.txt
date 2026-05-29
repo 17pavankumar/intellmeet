@@ -1,0 +1,42 @@
+# =========================================================================
+# IntellMeet Platform - System and Dependency Requirements
+# =========================================================================
+# This is a full-stack MERN (MongoDB, Express, React, Node) application.
+# Dependencies are natively managed via Node Package Manager (npm).
+# Below are the required environment, database, and package versions.
+# =========================================================================
+
+# 1. System Requirements & Environment Engines
+# -------------------------------------------------------------------------
+NodeJS=v18.0.0 or higher
+NPM=v9.0.0 or higher
+MongoDB_Community_Server=v6.0 or higher
+Operating_System=Windows, macOS, or Linux
+
+# 2. Backend Server Dependencies (NodeJS/Express)
+# -------------------------------------------------------------------------
+# Configured in: /backend/package.json
+bcryptjs=^3.0.3          # Password hashing
+cors=^2.8.6              # Cross-Origin Resource Sharing
+dotenv=^17.4.2           # Environment variable loader
+express=^5.2.1           # Express router web server framework
+express-rate-limit=^8.5.1 # Security: Brute-force rate limiting
+helmet=^8.1.0            # Security: Secure HTTP headers
+jsonwebtoken=^9.0.3      # Stateless JWT user authentication
+mongoose=^9.6.1          # MongoDB Object Modeling (ODM)
+socket.io=^4.8.3         # Real-time WebSocket server
+openai=^6.37.0           # AI summary integrations (OpenAI SDK)
+
+# 3. Frontend Client Dependencies (React/TypeScript/Vite)
+# -------------------------------------------------------------------------
+# Configured in: /frontend/package.json
+react=^19.2.5            # React UI engine
+react-dom=^19.2.5        # React document object model binding
+react-router-dom=^7.15.1 # Client-side routing manager
+axios=^1.16.0            # HTTP request library for API calls
+zustand=^5.0.13          # Global client-side state store manager
+socket.io-client=^4.8.3  # WebSocket real-time client
+framer-motion=^12.38.0   # UI animations engine
+lucide-react=^1.14.0     # UI modern vector icons
+typescript=~6.0.2        # Static type checking compiler
+vite=^8.0.10             # Vite development server and bundling engine
