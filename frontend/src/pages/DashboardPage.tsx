@@ -50,7 +50,7 @@ const DashboardPage: React.FC = () => {
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}
           >
-            <span className="nav-icon">🏠</span> Dashboard
+            <span className="nav-icon"></span> Dashboard
           </a>
           <a
             href="#"
@@ -58,7 +58,7 @@ const DashboardPage: React.FC = () => {
             className={`nav-item ${activeTab === 'meetings' ? 'active' : ''}`}
             onClick={(e) => { e.preventDefault(); setActiveTab('meetings'); }}
           >
-            <span className="nav-icon">📅</span> Meetings
+            <span className="nav-icon"></span> Meetings
           </a>
           <a
             href="#"
@@ -66,7 +66,7 @@ const DashboardPage: React.FC = () => {
             className={`nav-item ${activeTab === 'tasks' ? 'active' : ''}`}
             onClick={(e) => { e.preventDefault(); setActiveTab('tasks'); }}
           >
-            <span className="nav-icon">✅</span> Tasks
+            <span className="nav-icon"></span> Tasks
           </a>
         </nav>
         
@@ -129,7 +129,7 @@ const DashboardPage: React.FC = () => {
               <div className="loading-state">Loading meetings...</div>
             ) : meetings.length === 0 ? (
               <div className="empty-state">
-                <p>📅 No meetings yet.</p>
+                <p>No meetings yet.</p>
                 <p>Click "+ New Meeting" to create one.</p>
               </div>
             ) : (
@@ -163,7 +163,7 @@ const DashboardPage: React.FC = () => {
               <div className="loading-state">Loading meetings...</div>
             ) : meetings.length === 0 ? (
               <div className="empty-state">
-                <p>📅 No meetings yet.</p>
+                <p>No meetings yet.</p>
               </div>
             ) : (
               <div className="meetings-grid">

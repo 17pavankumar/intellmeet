@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useMeetingStore from '../store/meetingStore';
 import './CreateMeetingModal.css';
 
@@ -10,6 +11,8 @@ interface Props {
 /**
  * CreateMeetingModal Component
  * Renders an overlay dialog box with a form to schedule a new meeting.
+ * On success: navigates directly to the newly created meeting room.
+ * On error: shows the error message in the form without closing.
  */
 const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
   // Local state hook variables to store user form inputs
@@ -17,19 +20,37 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('');
 
+  // Local error state to display inline form errors to the user
+  const [formError, setFormError] = useState<string | null>(null);
+
   // Retrieve the meeting creation action and loading indicator from meeting global store
   const { createMeeting, isLoading } = useMeetingStore();
+
+  // React Router navigate hook to redirect after meeting is created
+  const navigate = useNavigate();
 
   // Handler for form submit events
   const handleSubmit = async (e: React.FormEvent) => {
     // Prevent browser reload on submit
     e.preventDefault();
-    
-    // Call store action to save meeting details in backend MongoDB database
-    await createMeeting(title, description, startTime);
-    
-    // Close the modal upon success
-    onClose();
+
+    // Clear any previous form error before trying again
+    setFormError(null);
+
+    try {
+      // Call store action to save meeting in backend MongoDB database.
+      // createMeeting returns the new meeting object on success, or throws on failure.
+      const newMeeting = await createMeeting(title, description, startTime);
+
+      // Close the modal overlay
+      onClose();
+
+      // Navigate directly into the meeting room using the new meeting's ID
+      navigate(`/meeting/${newMeeting._id}`);
+    } catch (err: any) {
+      // Show the error message inside the form instead of silently failing
+      setFormError(err.message || 'Failed to create meeting. Please try again.');
+    }
   };
 
   return (
@@ -84,6 +105,16 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
             />
           </div>
 
+          {/* Inline error message — shown only when meeting creation fails */}
+          {formError && (
+            <div className="form-error-banner">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              <span>{formError}</span>
+            </div>
+          )}
+
           <div className="modal-footer">
             {/* Cancel Button */}
             <button
@@ -91,6 +122,7 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
               type="button"
               className="cancel-btn"
               onClick={onClose}
+              disabled={isLoading}
             >
               Cancel
             </button>
@@ -102,7 +134,7 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
               className="submit-btn"
               disabled={isLoading}
             >
-              {isLoading ? 'Creating...' : 'Create Meeting'}
+              {isLoading ? 'Creating...' : 'Create & Join'}
             </button>
           </div>
           

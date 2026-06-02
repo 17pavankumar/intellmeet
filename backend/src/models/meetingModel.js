@@ -35,6 +35,18 @@ const meetingSchema = new mongoose.Schema({
     enum: ['scheduled', 'ongoing', 'completed'], // Meeting status life cycle values
     default: 'scheduled' // Default state when meeting is created
   },
+  accessType: {
+    type: String,
+    enum: ['public', 'restricted'],
+    default: 'public'
+  },
+  invitedEmails: [
+    {
+      type: String,
+      trim: true,
+      lowercase: true
+    }
+  ],
   // AI-generated intelligence data
   summary: {
     type: String,
@@ -61,6 +73,9 @@ const meetingSchema = new mongoose.Schema({
       sender: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User' // Reference to the user who sent the message
+      },
+      senderName: {
+        type: String // For guest names or fallback names
       },
       text: {
         type: String // Content of the message

@@ -54,5 +54,28 @@ const adminOnly = (req, res, next) => {
   }
 };
 
+/**
+ * Route protection middleware to optionally authenticate users.
+ * If a token is provided and valid, it attaches 'req.user'.
+ * Otherwise, it proceeds as a guest without returning an error.
+ */
+const optionalProtect = async (req, res, next) => {
+  let token;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = await User.findById(decoded.id).select('-password');
+      return next();
+    } catch (error) {
+      // Proceed without blocking if token is invalid/expired
+      return next();
+    }
+  }
+  next();
+};
+
 // Export middleware functions to make them available for route files
-module.exports = { protect, adminOnly };
+module.exports = { protect, adminOnly, optionalProtect };
+

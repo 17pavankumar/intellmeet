@@ -75,10 +75,84 @@ const getMeetingById = async (req, res) => {
       return res.status(404).json({ message: 'Meeting not found' });
     }
 
+    // Access control check for restricted meetings
+    if (meeting.accessType === 'restricted') {
+      if (!req.user) {
+        return res.status(403).json({
+          message: 'This meeting is restricted. You must be signed in and invited to join.',
+          isRestricted: true
+        });
+      }
+
+      const hostId = meeting.host._id ? meeting.host._id.toString() : meeting.host.toString();
+      const userId = req.user._id.toString();
+      const userEmail = req.user.email ? req.user.email.toLowerCase().trim() : '';
+
+      const isHost = hostId === userId;
+      const isInvited = meeting.invitedEmails && meeting.invitedEmails.some(
+        email => email.toLowerCase().trim() === userEmail
+      );
+      const isParticipant = meeting.participants && meeting.participants.some(
+        p => (p._id ? p._id.toString() : p.toString()) === userId
+      );
+
+      if (!isHost && !isInvited && !isParticipant) {
+        return res.status(403).json({
+          message: 'This meeting is restricted. Only invited guests are permitted to join.',
+          isRestricted: true
+        });
+      }
+    }
+
     // Return meeting document
     return res.json(meeting);
   } catch (error) {
     // Return server error if query fails
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * @route   PATCH /api/meetings/:id/access
+ * @desc    Update meeting access control settings (accessType and invitedEmails)
+ * @access  Private (Only meeting host can change settings)
+ */
+const updateMeetingAccess = async (req, res) => {
+  const { accessType, invitedEmails } = req.body;
+
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    // Authorization check: Only host user has permission to change settings
+    const hostId = meeting.host._id ? meeting.host._id.toString() : meeting.host.toString();
+    if (hostId !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the host can modify meeting access control settings' });
+    }
+
+    if (accessType) {
+      meeting.accessType = accessType;
+    }
+
+    if (invitedEmails !== undefined) {
+      meeting.invitedEmails = Array.isArray(invitedEmails)
+        ? invitedEmails.map(email => email.toLowerCase().trim())
+        : [];
+    }
+
+    await meeting.save();
+
+    // Populate and return updated meeting document
+    const updatedMeeting = await Meeting.findById(meeting._id)
+      .populate('host', 'name email avatar')
+      .populate('participants', 'name email avatar')
+      .populate('actionItems.assignedTo', 'name email')
+      .populate('messages.sender', 'name avatar');
+
+    return res.json(updatedMeeting);
+  } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
@@ -108,9 +182,60 @@ const updateMeetingStatus = async (req, res) => {
     // Update status
     meeting.status = status;
     
-    // If meeting status is changing to 'completed', record the current timestamp as endTime
+    // If meeting status is changing to 'completed', record the current timestamp as endTime and run AI pipeline
     if (status === 'completed') {
       meeting.endTime = Date.now();
+
+      // Compile transcript from stored chat messages
+      let transcriptText = '';
+      if (meeting.messages && meeting.messages.length > 0) {
+        // Populate sender names to give context to the AI
+        const populatedMeeting = await meeting.populate('messages.sender', 'name');
+        transcriptText = populatedMeeting.messages
+          .map((msg) => {
+            const senderName = msg.sender ? msg.sender.name : (msg.senderName || 'Participant');
+            return `${senderName}: ${msg.text}`;
+          })
+          .join('\n');
+      } else {
+        transcriptText = 'No chat messages were recorded during the meeting.';
+      }
+
+      console.log(`🤖 Compiling transcript for AI. Character count: ${transcriptText.length}`);
+
+      try {
+        const { generateMeetingSummary } = require('../services/aiService');
+        const Task = require('../models/taskModel');
+
+        // Call the AI summarizer service
+        const aiData = await generateMeetingSummary(transcriptText);
+        
+        meeting.summary = aiData.summary;
+        
+        // Populate meeting action items array
+        meeting.actionItems = aiData.actionItems.map((item) => ({
+          text: item,
+          assignedTo: meeting.host,
+          done: false
+        }));
+
+        // Automatically create Kanban tasks in the database for each action item
+        for (const item of aiData.actionItems) {
+          await Task.create({
+            title: item,
+            description: `Action item automatically extracted by AI from meeting: "${meeting.title}"`,
+            assignedTo: meeting.host,
+            createdBy: meeting.host,
+            meeting: meeting._id,
+            status: 'todo'
+          });
+        }
+        
+        console.log(`✅ Successfully generated AI summary and created ${aiData.actionItems.length} tasks for meeting: ${meeting.title}`);
+      } catch (aiErr) {
+        console.error('❌ AI summarization or task generation failed:', aiErr.message);
+        meeting.summary = `AI pipeline warning: Failed to run summarizer (${aiErr.message}).`;
+      }
     }
 
     // Save updated meeting details into database
@@ -188,6 +313,7 @@ module.exports = {
   createMeeting,
   getMyMeetings,
   getMeetingById,
+  updateMeetingAccess,
   updateMeetingStatus,
   saveMeetingSummary,
   deleteMeeting

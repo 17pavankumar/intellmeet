@@ -43,15 +43,8 @@ const App: React.FC = () => {
           } 
         />
         
-        {/* Protected route for live Meeting Room Screen */}
-        <Route 
-          path="/meeting/:id" 
-          element={
-            <ProtectedRoute>
-              <MeetingRoomPage />
-            </ProtectedRoute>
-          } 
-        />
+        {/* Route for live Meeting Room Screen (Public with Guest Join Lobby) */}
+        <Route path="/meeting/:id" element={<MeetingRoomPage />} />
         
         {/* Root Redirect: default root path `/` redirects directly to dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

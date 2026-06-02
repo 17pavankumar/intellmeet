@@ -8,7 +8,9 @@ interface Meeting {
   description: string;
   startTime: string;
   status: 'scheduled' | 'ongoing' | 'completed';
-  aiSummary?: string;
+  summary?: string;
+  actionItems?: { text: string; assignedTo?: any; done: boolean }[];
+  messages?: { sender: any; senderName?: string; text: string; createdAt: string }[];
 }
 
 // Define the state schema and actions for our Meeting store
@@ -18,7 +20,7 @@ interface MeetingState {
   isLoading: boolean; // True while waiting for meeting actions API calls to finish
   error: string | null; // Stores API error message strings if meeting actions fail
   fetchMeetings: () => Promise<void>; // Action: Load all meetings
-  createMeeting: (title: string, description: string, startTime: string) => Promise<void>; // Action: Create a new meeting
+  createMeeting: (title: string, description: string, startTime: string) => Promise<any>; // Action: Create a new meeting, returns the created meeting
   deleteMeeting: (id: string) => Promise<void>; // Action: Delete a meeting
   selectMeeting: (meeting: Meeting) => void; // Action: Set the currently active meeting
 }
@@ -50,6 +52,7 @@ const useMeetingStore = create<MeetingState>((set) => ({
   },
 
   // Action to create a new meeting
+  // Returns the new meeting object on success, or throws an error on failure.
   createMeeting: async (title, description, startTime) => {
     // Clear previous errors and set loading state to true
     set({ isLoading: true, error: null });
@@ -62,11 +65,16 @@ const useMeetingStore = create<MeetingState>((set) => ({
         meetings: [data, ...state.meetings], 
         isLoading: false 
       }));
+      
+      // Return the new meeting data so callers (like CreateMeetingModal)
+      // can navigate to the newly created meeting room immediately
+      return data;
     } catch (err: any) {
-      set({ 
-        error: err.response?.data?.message || 'Failed to create meeting', 
-        isLoading: false 
-      });
+      const message = err.response?.data?.message || 'Failed to create meeting. Make sure you are logged in and the backend is running.';
+      set({ error: message, isLoading: false });
+      
+      // Re-throw the error so the modal can catch it and show feedback
+      throw new Error(message);
     }
   },
 

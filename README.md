@@ -2,10 +2,10 @@
 
 > **Production-Grade Full-Stack MERN Application with Real-Time Video, AI Meeting Intelligence & Team Collaboration**
 
-**Prepared For:** Zidio Development – Web Development (MERN) Domain  
+<!-- **Prepared For:** Zidio Development – Web Development (MERN) Domain  
 **Author:** Pavan Kumar  
 **Date:** March 2026  
-**Version:** 2.0 – Industry Edition
+**Version:** 2.0 – Industry Edition -->
 
 ---
 
@@ -84,22 +84,47 @@ Meetings are the biggest time killer in enterprises. IntellMeet transforms meeti
 ### Prerequisites
 *   Node.js (v18+)
 *   MongoDB running locally (`mongodb://localhost:27017/intellmeet`)
-*   OpenAI API Key (Optional, for AI summaries)
+*   OpenAI API Key (Optional — only needed for AI meeting summaries)
 
-### Step 1: Start the Backend
-1. Open a terminal and navigate to the backend folder: `cd backend`
-2. Install dependencies: `npm install`
-3. Start the server: `npm start` *(Runs on port 5000)*
+### Step 1: Configure Backend Environment
+1. Navigate to the backend folder: `cd backend`
+2. Copy the example env file: `copy .env.example .env` (Windows) or `cp .env.example .env` (Mac/Linux)
+3. Edit `backend/.env` and set your values:
+   ```env
+   PORT=5000
+   MONGO_URI=mongodb://localhost:27017/intellmeet
+   JWT_SECRET=replace_with_a_long_random_string
+   NODE_ENV=development
+   OPENAI_API_KEY=sk-...   # Optional
+   ```
+4. Install dependencies: `npm install`
+5. Start the server: `npm start` *(Runs on port 5000)*
 
-### Step 2: Start the Frontend
-1. Open a new terminal and navigate to the frontend folder: `cd frontend`
-2. Install dependencies: `npm install`
-3. Start the development server: `npm run dev` *(Runs on port 5173/5174)*
+### Step 2: Configure Frontend Environment
+1. Navigate to the frontend folder: `cd frontend`
+2. Copy the example env file: `copy .env.example .env.local` (Windows) or `cp .env.example .env.local` (Mac/Linux)
+3. For local development the default values work — no edits needed.
+   > For production deployment, set `VITE_API_URL` and `VITE_SOCKET_URL` to your deployed backend URL.
+4. Install dependencies: `npm install`
+5. Start the dev server: `npm run dev` *(Runs on port 5173)*
 
 Open `http://localhost:5173` in your browser to view the application.
 
 ---
 
-## 7. Personal Reflection
+## 7. Key Features Added (Latest Updates)
 
-Building IntellMeet was an incredible journey into full-stack engineering. The biggest challenge was perfectly syncing real-time state using Socket.io while maintaining a clean, decoupled architecture between the React frontend and Express backend. Implementing modern security practices (Helmet, Rate Limiting, JWT) provided hands-on experience with enterprise-grade application hardening. In the future, I plan to deploy this architecture using Docker and Kubernetes to fully realize the week-4 scalability goals.
+| Feature | Description |
+| :--- | :--- |
+| **Meeting Access Control** | Hosts can restrict meetings to invited guests only via the ⋮ settings popover |
+| **Copy Link (Fallback)** | Meeting link copy works on both HTTP and HTTPS via clipboard + textarea fallback |
+| **Guest Lobby** | Unauthenticated users enter a name before joining; authenticated users skip directly in |
+| **Instant Join After Create** | Creating a meeting now navigates you directly into the room |
+| **WebRTC Name Relay** | Remote participant names and mute states now correctly sync across all peers |
+| **AI Insights Modal** | Completed meetings show AI summary, action items, and full chat transcript |
+
+---
+
+<!-- ## 7. Personal Reflection
+
+Building IntellMeet was an incredible journey into full-stack engineering. The biggest challenge was perfectly syncing real-time state using Socket.io while maintaining a clean, decoupled architecture between the React frontend and Express backend. Implementing modern security practices (Helmet, Rate Limiting, JWT) provided hands-on experience with enterprise-grade application hardening. In the future, I plan to deploy this architecture using Docker and Kubernetes to fully realize the week-4 scalability goals. -->
