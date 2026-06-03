@@ -1,5 +1,5 @@
 import React from 'react';
-import useTaskStore from '../store/taskStore';
+import { useUpdateTaskStatus, useDeleteTask } from '../hooks/useTasks';
 import './TaskCard.css';
 
 // Shape definition of a Task object
@@ -27,12 +27,13 @@ const statusColors: Record<string, string> = {
  * Renders a task details card inside the Kanban column board layout.
  */
 const TaskCard: React.FC<Props> = ({ task }) => {
-  // Retrieve task status update actions and delete actions from the global store
-  const { updateTaskStatus, deleteTask } = useTaskStore();
+  // Retrieve task status update actions and delete actions using React Query hooks
+  const updateStatusMutation = useUpdateTaskStatus();
+  const deleteTaskMutation = useDeleteTask();
 
   // Handle dropdown value changes to update task status in the database
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateTaskStatus(task._id, e.target.value);
+    updateStatusMutation.mutate({ id: task._id, status: e.target.value as any });
   };
 
   return (
@@ -61,7 +62,7 @@ const TaskCard: React.FC<Props> = ({ task }) => {
         {/* Delete button to remove task */}
         <button 
           className="delete-btn" 
-          onClick={() => deleteTask(task._id)}
+          onClick={() => deleteTaskMutation.mutate(task._id)}
         >
           Delete
         </button>

@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import useMeetingStore from '../store/meetingStore';
+import React, { useState } from 'react';
+import { useMeetings } from '../hooks/useMeetings';
+import { useTasks } from '../hooks/useTasks';
 import useAuthStore from '../store/authStore';
-import useTaskStore from '../store/taskStore';
 import MeetingCard from '../components/MeetingCard.tsx';
 import CreateMeetingModal from '../components/CreateMeetingModal.tsx';
 import TasksBoard from '../components/TasksBoard.tsx';
 import CreateTaskModal from '../components/CreateTaskModal.tsx';
+import Analytics from '../components/Analytics.tsx';
 import './Dashboard.css';
 
 /**
@@ -18,19 +19,13 @@ const DashboardPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
 
-  // Retrieve state and action methods from the global Zustand stores
-  const { meetings, fetchMeetings, isLoading: loadingMeetings } = useMeetingStore();
-  const { fetchTasks, isLoading: loadingTasks } = useTaskStore();
+  // Retrieve data using React Query hooks
+  const { data: meetings = [], isLoading: loadingMeetings } = useMeetings();
+  const { isLoading: loadingTasks } = useTasks();
   const { user, logout } = useAuthStore();
 
-  // Load meeting list and task list from backend database when the page is first mounted
-  useEffect(() => {
-    fetchMeetings();
-    fetchTasks();
-  }, [fetchMeetings, fetchTasks]);
-
-  // Sidebar navigation tab selector state (dashboard, meetings, tasks)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'meetings' | 'tasks'>('dashboard');
+  // Sidebar navigation tab selector state (dashboard, meetings, tasks, analytics)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'meetings' | 'tasks' | 'analytics'>('dashboard');
 
   return (
     <div className="dashboard">
@@ -67,6 +62,14 @@ const DashboardPage: React.FC = () => {
             onClick={(e) => { e.preventDefault(); setActiveTab('tasks'); }}
           >
             <span className="nav-icon"></span> Tasks
+          </a>
+          <a
+            href="#"
+            id="nav-analytics"
+            className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={(e) => { e.preventDefault(); setActiveTab('analytics'); }}
+          >
+            <span className="nav-icon"></span> Analytics
           </a>
         </nav>
         
@@ -196,6 +199,19 @@ const DashboardPage: React.FC = () => {
             ) : (
               <TasksBoard />
             )}
+          </>
+        )}
+
+        {/* TAB VIEW: ANALYTICS */}
+        {activeTab === 'analytics' && (
+          <>
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">Analytics & Insights</h1>
+                <p className="page-subtitle">Understand meeting statistics and task progress</p>
+              </div>
+            </div>
+            <Analytics />
           </>
         )}
         

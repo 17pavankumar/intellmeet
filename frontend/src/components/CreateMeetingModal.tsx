@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useMeetingStore from '../store/meetingStore';
+import { useCreateMeeting } from '../hooks/useMeetings';
+import { AlertCircle } from 'lucide-react';
 import './CreateMeetingModal.css';
 
 // Props expected by the modal component
@@ -23,8 +24,9 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
   // Local error state to display inline form errors to the user
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Retrieve the meeting creation action and loading indicator from meeting global store
-  const { createMeeting, isLoading } = useMeetingStore();
+  // Retrieve the meeting creation action and loading indicator using React Query hook
+  const createMeetingMutation = useCreateMeeting();
+  const { isPending: isLoading } = createMeetingMutation;
 
   // React Router navigate hook to redirect after meeting is created
   const navigate = useNavigate();
@@ -38,9 +40,8 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
     setFormError(null);
 
     try {
-      // Call store action to save meeting in backend MongoDB database.
-      // createMeeting returns the new meeting object on success, or throws on failure.
-      const newMeeting = await createMeeting(title, description, startTime);
+      // Call mutation to save meeting in backend MongoDB database.
+      const newMeeting = await createMeetingMutation.mutateAsync({ title, description, startTime });
 
       // Close the modal overlay
       onClose();
@@ -108,9 +109,7 @@ const CreateMeetingModal: React.FC<Props> = ({ onClose }) => {
           {/* Inline error message — shown only when meeting creation fails */}
           {formError && (
             <div className="form-error-banner">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-              </svg>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{formError}</span>
             </div>
           )}

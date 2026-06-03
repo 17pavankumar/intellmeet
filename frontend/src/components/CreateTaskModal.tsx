@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import useTaskStore from '../store/taskStore';
+import { useCreateTask } from '../hooks/useTasks';
 import './CreateMeetingModal.css';
 
 // Props expected by the modal component
@@ -16,8 +16,8 @@ const CreateTaskModal: React.FC<Props> = ({ onClose }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  // Retrieve the task creation action from task global store
-  const { createTask } = useTaskStore();
+  // Retrieve the task creation action using React Query hook
+  const createTaskMutation = useCreateTask();
 
   // Handler for form submit events
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,8 +26,8 @@ const CreateTaskModal: React.FC<Props> = ({ onClose }) => {
     // Validate that the task title contains non-whitespace text
     if (!title.trim()) return;
     
-    // Call store action to create task inside database with default state 'todo'
-    await createTask(title, description, 'todo');
+    // Call mutation to create task inside database with default state 'todo'
+    await createTaskMutation.mutateAsync({ title, description, status: 'todo' });
     
     // Close modal
     onClose();

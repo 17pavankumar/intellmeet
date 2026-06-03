@@ -39,6 +39,8 @@ Meetings are the biggest time killer in enterprises. IntellMeet transforms meeti
 | **F-03** | AI Intelligence | Automatic summary generation & action item extraction | Accurate summaries using OpenAI |
 | **F-04** | Real-Time Chat | In-meeting chat and real-time collaboration | Real-time sync across participants via Socket.io |
 | **F-05** | Dashboard & Tasks | Post-meeting dashboard, task creation and management | Actionable task list, status tracking |
+| **F-06** | Analytics Dashboard | Visual charts (bar/donut/progress) for meetings and tasks | SVG charts with no external chart library |
+| **F-07** | Meeting Access Control | Hosts restrict meetings to invited emails only | Public/restricted toggle, invited email list |
 
 ---
 
@@ -47,12 +49,14 @@ Meetings are the biggest time killer in enterprises. IntellMeet transforms meeti
 | Category | Technology | Rationale / Alternatives |
 | :--- | :--- | :--- |
 | **Frontend** | React 19 + TypeScript + Vite | Fast HMR, excellent developer experience |
-| **State Management** | Zustand | Lightweight client-state management |
+| **Server State** | TanStack React Query v5 | Automatic cache, background refetch, mutation invalidation |
+| **Client State** | Zustand | Lightweight auth/UI state (not used for server data) |
 | **Backend** | Node.js + Express | Fast, scalable event-driven architecture |
 | **Database** | MongoDB + Mongoose | Flexible NoSQL schema for unstructured meeting data |
-| **Real-Time** | Socket.io + WebRTC | Bidirectional real-time communication |
-| **AI Integration** | OpenAI API | Industry-leading text summarization |
+| **Real-Time** | Socket.io + WebRTC | Bidirectional real-time communication + P2P video |
+| **AI Integration** | OpenAI API (GPT-4o-mini) | Industry-leading text summarization; mock fallback when key absent |
 | **Security** | Helmet + Express Rate Limit | OWASP Top 10 mitigation |
+| **DevOps** | GitHub Actions + Docker Compose | Automated CI pipeline + local container stack |
 
 ---
 
@@ -76,6 +80,7 @@ Meetings are the biggest time killer in enterprises. IntellMeet transforms meeti
 *   **Rate Limiting:** Added `express-rate-limit` to prevent brute-force attacks on the API.
 *   **Authentication:** Stateless JWT (JSON Web Tokens) with `bcryptjs` for secure password hashing.
 *   **Real-Time Data:** Utilized Socket.io rooms to segment meeting traffic, ensuring chat messages are only broadcast to users currently in that specific meeting room.
+*   **Code Simplicity & Educational Design:** Core logic functions (like transcript creation, statistics filtering, and socket relay handlers) have been rewritten to avoid complex/compound expressions, chained operations, or destructuring rest/spread patterns. These have been replaced with explicit variables, simple `for` loops, and exhaustive line-by-line explanations directly inside the source files.
 
 ---
 
@@ -122,8 +127,25 @@ Open `http://localhost:5173` in your browser to view the application.
 | **Instant Join After Create** | Creating a meeting now navigates you directly into the room |
 | **WebRTC Name Relay** | Remote participant names and mute states now correctly sync across all peers |
 | **AI Insights Modal** | Completed meetings show AI summary, action items, and full chat transcript |
+| **Analytics Tab** | Visual SVG bar chart (meetings by day), donut chart (status breakdown), and task progress bar — built without any external chart library |
+| **Code Simplification** | Core business logic, charts filtering, and WebRTC events rewritten into explicit loops/variables with line-by-line comments |
 
 ---
+
+## 8. Documentation
+
+Every file in the codebase has a dedicated beginner-friendly explanation in the [`docs/`](./docs/) folder.
+
+| Quick Links | |
+| :--- | :--- |
+| 📖 [Full Documentation Index](./docs/00_INDEX.md) | Browse all 22 explanation documents |
+| 🚀 [Deployment Guide](./DEPLOYMENT.md) | Local, Docker & Cloud (Render + Vercel + Atlas) |
+| 🔒 [Auth Middleware](./docs/07_auth_middleware_explanation.md) | How JWT validation works |
+| 🧠 [AI Service](./docs/11_ai_service_explanation.md) | OpenAI integration + mock fallback |
+| 🔌 [Socket Signaling](./docs/12_meeting_socket_explanation.md) | WebRTC offer/answer relay |
+| 📹 [Meeting Room Page](./docs/22_meeting_room_page_explanation.md) | Complete WebRTC + Socket lifecycle |
+| 📊 [Analytics Component](./docs/21_analytics_explanation.md) | SVG charts + useMemo data processing |
+| 🗄️ [MongoDB Models](./docs/13_models_explanation.md) | User, Meeting, Task schemas explained |
 
 <!-- ## 7. Personal Reflection
 

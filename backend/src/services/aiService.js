@@ -1,30 +1,39 @@
-const { OpenAI } = require('openai');
+// Load the OpenAI client library from dependencies
+const OpenAIConnection = require('openai');
+const OpenAI = OpenAIConnection.OpenAI;
 
 /**
- * AI Service Module
- * Handles generating text summaries and extracting tasks from meeting transcripts.
- * Connects to OpenAI API if a valid key is provided in environment variables,
- * otherwise falls back to a mock summary generator for safety.
- */
-
-/**
- * Simulates or calls OpenAI service to process meeting transcript text.
- * @param {string} transcriptText - The raw text of all chat/speech in the meeting.
- * @returns {Promise<Object>} An object containing the AI summary, key points, and action items.
+ * Service to compile a text summary of the meeting and detect tasks/action items.
+ * If OpenAI keys are not configured properly, it falls back gracefully to mock simulated summaries.
  */
 const generateMeetingSummary = async (transcriptText) => {
+  // Retrieve the OpenAI API Key from environment variables
   const apiKey = process.env.OPENAI_API_KEY;
   
-  // Check if API key exists and is not a placeholder
-  const isMock = !apiKey || apiKey === 'your_openai_api_key_here' || apiKey.startsWith('YOUR_');
+  // Flag indicating whether to use mock data instead of calling external OpenAI servers
+  let isMock = false;
 
+  // If apiKey is undefined, empty, or set to placeholder string, enable mock fallback mode
+  if (!apiKey) {
+    isMock = true;
+  } else if (apiKey === 'your_openai_api_key_here') {
+    isMock = true;
+  } else if (apiKey.indexOf('YOUR_') === 0) {
+    isMock = true;
+  }
+
+  // If mock mode is true, call mock summarizer helper directly
   if (isMock) {
     console.log('⚠️ OpenAI API Key is not configured in .env. Returning simulated AI summary.');
-    return getMockSummary(transcriptText);
+    const mockResult = getMockSummary(transcriptText);
+    return mockResult;
   }
 
   try {
-    const openai = new OpenAI({ apiKey });
+    // Instantiate the OpenAI SDK client object using local api key
+    const openai = new OpenAI({ apiKey: apiKey });
+
+    // Request text analysis completion from GPT model using structural JSON response format
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -34,33 +43,50 @@ const generateMeetingSummary = async (transcriptText) => {
         },
         {
           role: 'user',
-          content: `Here is the meeting transcript:\n\n${transcriptText}`
+          content: 'Here is the meeting transcript:\n\n' + transcriptText
         }
       ],
       response_format: { type: 'json_object' }
     });
 
-    const result = JSON.parse(response.choices[0].message.content);
+    // Parse the string message content from GPT JSON response
+    const jsonContent = response.choices[0].message.content;
+    const result = JSON.parse(jsonContent);
+
+    // Extract fields safely, defaulting to empty placeholders if any key is missing
+    const summary = result.summary || 'No summary generated.';
+    const keyPoints = result.keyPoints || [];
+    const actionItems = result.actionItems || [];
+
+    // Return the formatted object
     return {
-      summary: result.summary || 'No summary generated.',
-      keyPoints: result.keyPoints || [],
-      actionItems: result.actionItems || []
+      summary: summary,
+      keyPoints: keyPoints,
+      actionItems: actionItems
     };
   } catch (error) {
+    // If the external network request fails, print log and return simulated summary instead
     console.error('❌ OpenAI API call failed. Falling back to mock summary:', error.message);
-    return getMockSummary(transcriptText);
+    const mockResult = getMockSummary(transcriptText);
+    return mockResult;
   }
 };
 
 /**
- * Fallback function returning simulated structured meeting summaries.
+ * Returns a simulated meeting summary and tasks list for fallback safety.
  */
 const getMockSummary = (transcriptText) => {
-  // Prepend prefix to show it's mock
-  const truncatedText = transcriptText.length > 100 ? `${transcriptText.slice(0, 100)}...` : transcriptText;
+  // Truncate the transcript text to prevent huge logs
+  let truncatedText = '';
+  if (transcriptText.length > 100) {
+    truncatedText = transcriptText.slice(0, 100) + '...';
+  } else {
+    truncatedText = transcriptText;
+  }
   
+  // Return the mock summary layout object
   return {
-    summary: `[Simulated Summary] Discussion based on transcript: "${truncatedText}"`,
+    summary: '[Simulated Summary] Discussion based on transcript: "' + truncatedText + '"',
     actionItems: [
       'Follow up on discussed topics',
       'Schedule next sprint review',
@@ -74,5 +100,8 @@ const getMockSummary = (transcriptText) => {
   };
 };
 
-// Export the service helper functions
-module.exports = { generateMeetingSummary };
+// Export the meeting summary generation helper function
+module.exports = { 
+  generateMeetingSummary: generateMeetingSummary 
+};
+

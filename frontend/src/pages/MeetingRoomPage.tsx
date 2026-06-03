@@ -3,74 +3,147 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import useAuthStore from '../store/authStore';
 import API from '../services/api';
+import {
+  Mic, MicOff, Video, VideoOff, Monitor, MessageSquare, Users, PhoneOff,
+  Lock, X, Send, Shield, Copy, Check, MoreVertical
+} from 'lucide-react';
 import './MeetingRoomPage.css';
 
-// TypeScript schema for chat messages exchanged in the room
+// Schema for messages sent inside the chat drawer
 interface ChatMessage {
   sender: string;
   message: string;
   timestamp: string;
 }
 
-/**
- * MeetingRoomPage Component
- * Core interface for real-time video conferencing. It combines:
- * 1. WebRTC peer connections to share camera/mic streams directly peer-to-peer.
- * 2. Socket.io to coordinate signaling events (offers, answers, ice candidates) and live chat text sync.
- */
+// Simple helper function to extract user initials from their full name
+const getInitials = (fullName: string): string => {
+  // If name is empty, fallback to 'Participant'
+  const name = fullName || 'Participant';
+  // Split the name string into an array of words
+  const parts = name.split(' ');
+  // Initialize accumulator for initials
+  let initials = '';
+  // Loop through words to get the first letter of each
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part && part.length > 0) {
+      initials += part.charAt(0);
+    }
+    // Restrict initials length to at most 2 characters
+    if (initials.length >= 2) {
+      break;
+    }
+  }
+  // Return the initials in uppercase format
+  return initials.toUpperCase();
+};
+
+// Sub-component to bind and render remote participant video streams cleanly
+interface RemoteVideoProps {
+  stream: MediaStream;
+}
+
+const RemoteVideo: React.FC<RemoteVideoProps> = (props) => {
+  const stream = props.stream;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Monitor stream updates and bind to video DOM element
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+    }
+  }, [stream]);
+
+  return (
+    <video 
+      ref={videoRef}
+      autoPlay 
+      playsInline 
+      className="meet-video-stream remote"
+    />
+  );
+};
+
 const MeetingRoomPage: React.FC = () => {
-  // Extract meeting ID from the URL path (/meeting/:id)
-  const { id } = useParams<{ id: string }>();
+  // Extract meeting ID from URL params
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  
+  // Router hook to redirect users back to dashboard
   const navigate = useNavigate();
   
-  // Get active session user from the global Zustand auth store
-  const { user } = useAuthStore();
+  // Fetch active user context from Zustand authentication store
+  const authStore = useAuthStore();
+  const user = authStore.user;
   
-  // ==========================================================================
-  // STATE MANAGEMENT
-  // ==========================================================================
+  // State: holds meeting settings and info from MongoDB
+  const [meeting, setMeeting] = useState<any>(null);
   
-  // 1. Meeting & Message states
-  const [meeting, setMeeting] = useState<any>(null); // DB details (host, title, settings, invites)
-  const [messages, setMessages] = useState<ChatMessage[]>([]); // Conversation history list
-  const [messageInput, setMessageInput] = useState(''); // Text in message input field
+  // State: lists chat messages sent during the call
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   
-  // 2. WebRTC & Media streams states
-  const [participants, setParticipants] = useState<string[]>([]); // Active remote socket IDs
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({}); // Remote peer MediaStreams
-  const [mediaError, setMediaError] = useState<string | null>(null); // Permission errors
-  const [isScreenSharing, setIsScreenSharing] = useState(false); // Screen sharing track state
+  // State: controls the user's text input inside chat form
+  const [messageInput, setMessageInput] = useState('');
   
-  // 3. User local device mute toggles
+  // State: tracks socket IDs of other peers in the room
+  const [participants, setParticipants] = useState<string[]>([]);
+  
+  // State: mappings of remote socket IDs to their respective MediaStreams
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  
+  // State: error description when hardware devices can't be fetched
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  
+  // State: checks if the local user is presenting their screen
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  
+  // State: toggle mic status for local user
   const [isMicMuted, setIsMicMuted] = useState(false);
+  
+  // State: toggle camera status for local user
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   
-  // 4. Remote peers mute states & names (relayed via WebSockets)
+  // State: keeps track of remote participant mute states (audio/video)
   const [remoteMuteStates, setRemoteMuteStates] = useState<Record<string, { audio: boolean, video: boolean }>>({});
+  
+  // State: lists name text for each socket participant
   const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
   
-  // 5. Drawer, copy, & guest states
+  // State: sidebar display selector (chat log vs participant roster drawer)
   const [activeSidebar, setActiveSidebar] = useState<'chat' | 'participants' | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [guestName, setGuestName] = useState('');
-  const [isReadyToJoin, setIsReadyToJoin] = useState(!!user); // Skip lobby if logged in
   
-  // 6. Access Control & Invitation settings states
-  const [restrictionError, setRestrictionError] = useState<string | null>(null); // Block page overlay
-  const [showShareModal, setShowShareModal] = useState(false); // 3-dots menu visibility
-  const [newInviteEmail, setNewInviteEmail] = useState(''); // Text in guest invite field
-  const [isSavingAccess, setIsSavingAccess] = useState(false); // Network saving state
+  // State: confirms if sharing info has been copied to clipboard
+  const [copied, setCopied] = useState(false);
+  
+  // State: guest name text entered in the lobby before joining
+  const [guestName, setGuestName] = useState('');
+  
+  // State: flag to bypass lobby if user is already signed in
+  const [isReadyToJoin, setIsReadyToJoin] = useState(!!user);
+  
+  // State: block page if access is restricted
+  const [restrictionError, setRestrictionError] = useState<string | null>(null);
+  
+  // State: opens 3-dots share config dropdown
+  const [showShareModal, setShowShareModal] = useState(false);
+  
+  // State: text to type guest invite email
+  const [newInviteEmail, setNewInviteEmail] = useState('');
+  
+  // State: loader indicator during access list modifications
+  const [isSavingAccess, setIsSavingAccess] = useState(false);
 
-  // ==========================================================================
-  // REFS (Persistent mutable references that don't trigger re-renders)
-  // ==========================================================================
-  const socketRef = useRef<Socket | null>(null); // Live Socket.io client instance
-  const localStreamRef = useRef<MediaStream | null>(null); // Camera + Mic MediaStream reference
-  const localVideoRef = useRef<HTMLVideoElement>(null); // Local video DOM node
-  const peersRef = useRef<Record<string, RTCPeerConnection>>({}); // Active WebRTC Peer connections
-  const screenStreamRef = useRef<MediaStream | null>(null); // Current presentation screen stream
+  // References to keep persistent state values across renders without re-rendering
+  const socketRef = useRef<Socket | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const peersRef = useRef<Record<string, RTCPeerConnection>>({});
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // Standard STUN servers configuration for NAT traversal/discovering public endpoints
+  // STUN servers configuration for network discovery
   const configuration = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -78,23 +151,20 @@ const MeetingRoomPage: React.FC = () => {
     ]
   };
 
-  // ==========================================================================
-  // EFFECT 1: Load Meeting Info & Check Access Restrictions
-  // ==========================================================================
+  // EFFECT: Fetch meeting configuration and check credentials on load
   useEffect(() => {
     let isMounted = true;
     
     const fetchMeeting = async () => {
       try {
-        const { data } = await API.get(`/meetings/${id}`);
+        const response = await API.get('/meetings/' + id);
         if (isMounted) {
-          setMeeting(data);
-          setRestrictionError(null); // Access granted, clear errors
+          setMeeting(response.data);
+          setRestrictionError(null);
         }
       } catch (err: any) {
         console.error("Failed to load meeting details from DB", err);
         if (isMounted) {
-          // If server returns 403, user is uninvited/unauthorized to join
           if (err.response?.status === 403 || err.response?.data?.isRestricted) {
             setRestrictionError(err.response?.data?.message || "This meeting is restricted. You are not authorized to join.");
           } else {
@@ -111,28 +181,25 @@ const MeetingRoomPage: React.FC = () => {
     };
   }, [id]);
 
-  // ==========================================================================
-  // EFFECT 2: Initialize Audio/Video Streams & Socket.io Signaling
-  // ==========================================================================
+  // EFFECT: Access local media stream and initialize websocket connection
   useEffect(() => {
-    // Only run if user submitted lobby name, meeting exists in DB, and access is permitted
     if (!isReadyToJoin || !meeting || restrictionError) return;
     let isMounted = true;
 
     const initMeeting = async () => {
-      // Step A: Request local webcam and microphone permission
       try {
+        // Request local user hardware access
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         
-        // Clean up tracks if user navigated away during permission prompt
         if (!isMounted) {
           stream.getTracks().forEach(track => track.stop());
           return;
         }
         
+        // Save the stream locally
         localStreamRef.current = stream;
         
-        // Bind local stream to the video DOM element using direct assignment if ref is ready
+        // Assign stream directly to video ref if bound
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
@@ -145,89 +212,163 @@ const MeetingRoomPage: React.FC = () => {
       
       if (!isMounted) return;
       
-      // Step B: Connect to the backend Socket.io signaling server
-      const socketHost = typeof window !== 'undefined' && window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
-      const socketUrl = import.meta.env.VITE_SOCKET_URL || `http://${socketHost}:5000`;
+      // Select socket host address dynamically
+      let socketHost = 'localhost';
+      if (typeof window !== 'undefined') {
+        if (window.location.hostname === '127.0.0.1') {
+          socketHost = '127.0.0.1';
+        }
+      }
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || ('http://' + socketHost + ':5000');
+      
+      // Connect to WebSocket server
       socketRef.current = io(socketUrl);
 
       if (socketRef.current) {
-        // Notify the signaling server that we want to join the meeting room
-        socketRef.current.emit('join-meeting', { meetingId: id, userId: user?._id, name: user?.name || guestName });
+        // Send join meeting request payload
+        socketRef.current.emit('join-meeting', { 
+          meetingId: id, 
+          userId: user?._id, 
+          name: user?.name || guestName 
+        });
 
-        // LISTENER 1: A new participant has joined the room
-        socketRef.current.on('user-joined', ({ socketId, name }) => {
-          setParticipants(prev => {
-            if (!prev.includes(socketId)) return [...prev, socketId];
-            return prev;
+        // Event: A new participant joins the room
+        socketRef.current.on('user-joined', (payload) => {
+          const socketId = payload.socketId;
+          const participantName = payload.name;
+
+          setParticipants((prev) => {
+            const list = [];
+            for (let i = 0; i < prev.length; i++) {
+              list.push(prev[i]);
+            }
+            if (list.indexOf(socketId) === -1) {
+              list.push(socketId);
+            }
+            return list;
           });
-          if (name) {
-            setParticipantNames(prev => ({ ...prev, [socketId]: name }));
+
+          if (participantName) {
+            setParticipantNames((prev) => {
+              const obj = { ...prev };
+              obj[socketId] = participantName;
+              return obj;
+            });
           }
-          // Initiate a WebRTC peer connection (isInitiator = true)
+
+          // Instantiate a Peer Connection as initiator (isInitiator = true)
           createPeerConnection(socketId, true);
         });
 
-        // LISTENER 2: Receive WebRTC SDP Offer from another client
-        socketRef.current.on('webrtc-offer', async ({ senderSocketId, offer, senderName, isMicMuted: remoteMicMuted, isVideoMuted: remoteVideoMuted }) => {
-          setParticipants(prev => {
-            if (!prev.includes(senderSocketId)) return [...prev, senderSocketId];
-            return prev;
+        // Event: Relays WebRTC Offer from remote peer
+        socketRef.current.on('webrtc-offer', async (payload) => {
+          const senderSocketId = payload.senderSocketId;
+          const offer = payload.offer;
+          const senderName = payload.senderName;
+          const remoteMicMuted = payload.isMicMuted;
+          const remoteVideoMuted = payload.isVideoMuted;
+
+          setParticipants((prev) => {
+            const list = [];
+            for (let i = 0; i < prev.length; i++) {
+              list.push(prev[i]);
+            }
+            if (list.indexOf(senderSocketId) === -1) {
+              list.push(senderSocketId);
+            }
+            return list;
           });
+
           if (senderName) {
-            setParticipantNames(prev => ({ ...prev, [senderSocketId]: senderName }));
+            setParticipantNames((prev) => {
+              const obj = { ...prev };
+              obj[senderSocketId] = senderName;
+              return obj;
+            });
           }
-          setRemoteMuteStates(prev => ({
-            ...prev,
-            [senderSocketId]: { audio: !!remoteMicMuted, video: !!remoteVideoMuted }
-          }));
+
+          setRemoteMuteStates((prev) => {
+            const obj = { ...prev };
+            obj[senderSocketId] = { audio: !!remoteMicMuted, video: !!remoteVideoMuted };
+            return obj;
+          });
           
-          // Create matching peer connection (isInitiator = false)
+          // Instantiate a Peer Connection (isInitiator = false)
           const pc = createPeerConnection(senderSocketId, false);
           try {
-            // Apply offer as remote description
+            // Apply offer as remote session description
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             
-            // Create matching WebRTC Answer
+            // Create corresponding local Answer description
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             
-            // Send SDP Answer back to signaling channel
+            // Send answer back to the signaling post
+            let localMicMuted = false;
+            let localVideoMuted = false;
+            if (localStreamRef.current) {
+              const audioTrack = localStreamRef.current.getAudioTracks()[0];
+              if (audioTrack) {
+                localMicMuted = !audioTrack.enabled;
+              }
+              const videoTrack = localStreamRef.current.getVideoTracks()[0];
+              if (videoTrack) {
+                localVideoMuted = !videoTrack.enabled;
+              }
+            }
+
             socketRef.current?.emit('webrtc-answer', { 
               targetSocketId: senderSocketId, 
-              answer, 
+              answer: answer, 
               senderName: user?.name || guestName,
-              isMicMuted: localStreamRef.current ? !localStreamRef.current.getAudioTracks()[0]?.enabled : false,
-              isVideoMuted: localStreamRef.current ? !localStreamRef.current.getVideoTracks()[0]?.enabled : false
+              isMicMuted: localMicMuted,
+              isVideoMuted: localVideoMuted
             });
           } catch (err) {
             console.error("Error handling offer:", err);
           }
         });
 
-        // LISTENER 3: Receive WebRTC SDP Answer from remote peer
-        socketRef.current.on('webrtc-answer', async ({ senderSocketId, answer, senderName, isMicMuted: remoteMicMuted, isVideoMuted: remoteVideoMuted }) => {
+        // Event: Relays WebRTC Answer from remote peer
+        socketRef.current.on('webrtc-answer', async (payload) => {
+          const senderSocketId = payload.senderSocketId;
+          const answer = payload.answer;
+          const senderName = payload.senderName;
+          const remoteMicMuted = payload.isMicMuted;
+          const remoteVideoMuted = payload.isVideoMuted;
+
           const pc = peersRef.current[senderSocketId];
           if (pc) {
             try {
+              // Apply answer as remote description
               await pc.setRemoteDescription(new RTCSessionDescription(answer));
               if (senderName) {
-                setParticipantNames(prev => ({ ...prev, [senderSocketId]: senderName }));
+                setParticipantNames((prev) => {
+                  const obj = { ...prev };
+                  obj[senderSocketId] = senderName;
+                  return obj;
+                });
               }
-              setRemoteMuteStates(prev => ({
-                ...prev,
-                [senderSocketId]: { audio: !!remoteMicMuted, video: !!remoteVideoMuted }
-              }));
+              setRemoteMuteStates((prev) => {
+                const obj = { ...prev };
+                obj[senderSocketId] = { audio: !!remoteMicMuted, video: !!remoteVideoMuted };
+                return obj;
+              });
             } catch (err) {
               console.error("Error handling answer:", err);
             }
           }
         });
 
-        // LISTENER 4: Receive ICE candidate path route from remote peer
-        socketRef.current.on('webrtc-ice-candidate', async ({ senderSocketId, candidate }) => {
+        // Event: Relays ICE Candidate pathway configuration
+        socketRef.current.on('webrtc-ice-candidate', async (payload) => {
+          const senderSocketId = payload.senderSocketId;
+          const candidate = payload.candidate;
+
           const pc = peersRef.current[senderSocketId];
           if (pc && candidate) {
             try {
+              // Register new network endpoint candidate to current connection
               await pc.addIceCandidate(new RTCIceCandidate(candidate));
             } catch (err) {
               console.error("Error adding ice candidate:", err);
@@ -235,26 +376,48 @@ const MeetingRoomPage: React.FC = () => {
           }
         });
 
-        // LISTENER 5: Monitor remote participant mute changes
-        socketRef.current.on('user-mute-state', ({ socketId, type, isMuted: remoteMuted }) => {
-          setRemoteMuteStates(prev => {
-            const current = prev[socketId] || { audio: false, video: false };
-            return {
-              ...prev,
-              [socketId]: { ...current, [type === 'audio' ? 'audio' : 'video']: !!remoteMuted }
-            };
+        // Event: Relays remote user mute states changes
+        socketRef.current.on('user-mute-state', (payload) => {
+          const socketId = payload.socketId;
+          const type = payload.type;
+          const remoteMuted = payload.isMuted;
+
+          setRemoteMuteStates((prev) => {
+            const obj = { ...prev };
+            const current = obj[socketId] || { audio: false, video: false };
+            
+            if (type === 'audio') {
+              obj[socketId] = { audio: !!remoteMuted, video: current.video };
+            } else {
+              obj[socketId] = { audio: current.audio, video: !!remoteMuted };
+            }
+            return obj;
           });
         });
 
-        // LISTENER 6: A remote participant has disconnected/left
-        socketRef.current.on('user-left', ({ socketId }) => {
-          setParticipants(prev => prev.filter(p => p !== socketId));
-          setParticipantNames(prev => {
+        // Event: A remote participant leaves the call
+        socketRef.current.on('user-left', (payload) => {
+          const socketId = payload.socketId;
+
+          // Remove socket from states list
+          setParticipants((prev) => {
+            const list = [];
+            for (let i = 0; i < prev.length; i++) {
+              if (prev[i] !== socketId) {
+                list.push(prev[i]);
+              }
+            }
+            return list;
+          });
+
+          // Clean up participant tracking references
+          setParticipantNames((prev) => {
             const next = { ...prev };
             delete next[socketId];
             return next;
           });
-          setRemoteMuteStates(prev => {
+
+          setRemoteMuteStates((prev) => {
             const next = { ...prev };
             delete next[socketId];
             return next;
@@ -265,36 +428,49 @@ const MeetingRoomPage: React.FC = () => {
             delete peersRef.current[socketId];
           }
           
-          setRemoteStreams(prev => {
+          setRemoteStreams((prev) => {
             const next = { ...prev };
             delete next[socketId];
             return next;
           });
         });
 
-        // LISTENER 7: Live chat message syncing
+        // Event: Synchronizes live room chat messages
         socketRef.current.on('receive-message', (data: ChatMessage) => {
-          setMessages(prev => [...prev, data]);
+          setMessages((prev) => {
+            const list = [];
+            for (let i = 0; i < prev.length; i++) {
+              list.push(prev[i]);
+            }
+            list.push(data);
+            return list;
+          });
         });
       }
     };
 
     initMeeting();
 
-    // CLEANUP FUNCTION: Shuts down streams, socket, and WebRTC peer instances on exit
+    // CLEANUP: Close camera feeds and sockets on navigation away
     return () => {
       isMounted = false;
       
-      // Stop webcam and microphone hardware tracks
+      // Stop webcam and microphone tracks
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
+        const tracks = localStreamRef.current.getTracks();
+        for (let i = 0; i < tracks.length; i++) {
+          tracks[i].stop();
+        }
       }
       
-      // Close all active peer connections
-      Object.values(peersRef.current).forEach(pc => pc.close());
+      // Close WebRTC peer links
+      const activePeers = Object.values(peersRef.current);
+      for (let i = 0; i < activePeers.length; i++) {
+        activePeers[i].close();
+      }
       peersRef.current = {};
       
-      // Emit leave notification and disconnect
+      // Leave room channel and terminate socket
       if (socketRef.current) {
         socketRef.current.emit('leave-meeting', id);
         socketRef.current.disconnect();
@@ -303,14 +479,17 @@ const MeetingRoomPage: React.FC = () => {
     };
   }, [id, isReadyToJoin, !!meeting, !!restrictionError]);
 
-  // ==========================================================================
-  // WEBRTC SIGNALING UTILITY
-  // ==========================================================================
-  
-  /**
-   * Helper function to instantiate a new RTCPeerConnection object for a participant.
-   * Runs NAT STUN, registers ICE events, track handlers, and performs local track bindings.
-   */
+  // EFFECT: Keep video srcObject updated when camera streams change
+  useEffect(() => {
+    if (localVideoRef.current) {
+      const activeStream = isScreenSharing ? screenStreamRef.current : localStreamRef.current;
+      if (activeStream && localVideoRef.current.srcObject !== activeStream) {
+        localVideoRef.current.srcObject = activeStream;
+      }
+    }
+  }, [isScreenSharing, isReadyToJoin]);
+
+  // Helper method: builds new RTCPeerConnection object and hooks events
   const createPeerConnection = (socketId: string, isInitiator: boolean) => {
     if (peersRef.current[socketId]) {
       return peersRef.current[socketId];
@@ -319,8 +498,8 @@ const MeetingRoomPage: React.FC = () => {
     const pc = new RTCPeerConnection(configuration);
     peersRef.current[socketId] = pc;
 
-    // ICE Callback: Send network pathways to target peer via socket server
-    pc.onicecandidate = event => {
+    // Send local ICE candidates to target peer
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
         socketRef.current?.emit('webrtc-ice-candidate', {
           targetSocketId: socketId,
@@ -329,44 +508,73 @@ const MeetingRoomPage: React.FC = () => {
       }
     };
 
-    // Track Callback: Receives audio/video tracks and stores it in state to display
-    pc.ontrack = event => {
+    // Receive remote media tracks and save them to streams state
+    pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
-        setRemoteStreams(prev => ({ ...prev, [socketId]: event.streams[0] }));
+        const stream = event.streams[0];
+        setRemoteStreams((prev) => {
+          const obj = { ...prev };
+          obj[socketId] = stream;
+          return obj;
+        });
       }
     };
 
-    // Attach local hardware tracks to the peer connection so the remote peer receives it
+    // Attach local camera/mic tracks to feed the connection
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
+      const tracks = localStreamRef.current.getTracks();
+      for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        pc.addTrack(track, localStreamRef.current);
+      }
     }
 
-    // SDP Negotiation: Initiator creates SDP Offer, sets locally, and sends to signaling channel
+    // SDP Offer compilation for call initiator
     if (isInitiator) {
-      pc.createOffer()
-        .then(offer => pc.setLocalDescription(offer))
-        .then(() => {
-          socketRef.current?.emit('webrtc-offer', {
-            targetSocketId: socketId,
-            offer: pc.localDescription,
-            senderName: user?.name || guestName,
-            isMicMuted: localStreamRef.current ? !localStreamRef.current.getAudioTracks()[0]?.enabled : false,
-            isVideoMuted: localStreamRef.current ? !localStreamRef.current.getVideoTracks()[0]?.enabled : false
-          });
-        })
-        .catch(console.error);
+      const startNegotiation = async () => {
+        try {
+          // Create the WebRTC offer description
+          const offer = await pc.createOffer();
+          
+          // Save the offer description as local state on this PeerConnection
+          await pc.setLocalDescription(offer);
+          
+          // Determine if mic and video are enabled on the local stream
+          let micMuted = false;
+          let videoMuted = false;
+          if (localStreamRef.current) {
+            const audioTrack = localStreamRef.current.getAudioTracks()[0];
+            if (audioTrack) {
+              micMuted = !audioTrack.enabled;
+            }
+            const videoTrack = localStreamRef.current.getVideoTracks()[0];
+            if (videoTrack) {
+              videoMuted = !videoTrack.enabled;
+            }
+          }
+
+          // Emit the offer and user information to signaling channel
+          if (socketRef.current) {
+            socketRef.current.emit('webrtc-offer', {
+              targetSocketId: socketId,
+              offer: pc.localDescription,
+              senderName: user?.name || guestName,
+              isMicMuted: micMuted,
+              isVideoMuted: videoMuted
+            });
+          }
+        } catch (err) {
+          console.error("Error creating WebRTC offer:", err);
+        }
+      };
+      
+      startNegotiation();
     }
 
     return pc;
   };
 
-  // ==========================================================================
-  // DEVICE CONTROL EVENT HANDLERS
-  // ==========================================================================
-  
-  // Toggle microphone track
+  // Handler: toggle microphone track mute
   const toggleMic = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -382,7 +590,7 @@ const MeetingRoomPage: React.FC = () => {
     }
   };
 
-  // Toggle camera track
+  // Handler: toggle camera stream track mute
   const toggleVideo = () => {
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0];
@@ -398,27 +606,29 @@ const MeetingRoomPage: React.FC = () => {
     }
   };
 
-  // Start screen share stream and replace active tracks in peer connections
+  // Handler: request screen capture stream and swap tracks on peer links
   const shareScreen = async () => {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       screenStreamRef.current = screenStream;
       const screenTrack = screenStream.getVideoTracks()[0];
 
-      Object.values(peersRef.current).forEach((pc) => {
+      // Swap video track in all active peer connections
+      const connectionsList = Object.values(peersRef.current);
+      for (let i = 0; i < connectionsList.length; i++) {
+        const pc = connectionsList[i];
         const senders = pc.getSenders();
-        const videoSender = senders.find((sender) => sender.track?.kind === 'video');
-        if (videoSender) {
-          videoSender.replaceTrack(screenTrack);
+        for (let j = 0; j < senders.length; j++) {
+          const sender = senders[j];
+          if (sender.track && sender.track.kind === 'video') {
+            sender.replaceTrack(screenTrack);
+          }
         }
-      });
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = screenStream;
       }
 
       setIsScreenSharing(true);
 
+      // Restore camera feeds when presentation concludes
       screenTrack.onended = () => {
         stopScreenShare();
       };
@@ -427,37 +637,42 @@ const MeetingRoomPage: React.FC = () => {
     }
   };
 
-  // Stop screen sharing and restore local camera video tracks
+  // Handler: turn off screen presentation and restore local camera video tracks
   const stopScreenShare = () => {
     if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      const tracks = screenStreamRef.current.getTracks();
+      for (let i = 0; i < tracks.length; i++) {
+        tracks[i].stop();
+      }
       screenStreamRef.current = null;
     }
 
     if (localStreamRef.current) {
       const cameraTrack = localStreamRef.current.getVideoTracks()[0];
       
-      Object.values(peersRef.current).forEach((pc) => {
+      const connectionsList = Object.values(peersRef.current);
+      for (let i = 0; i < connectionsList.length; i++) {
+        const pc = connectionsList[i];
         const senders = pc.getSenders();
-        const videoSender = senders.find((sender) => sender.track?.kind === 'video');
-        if (videoSender && cameraTrack) {
-          videoSender.replaceTrack(cameraTrack);
+        for (let j = 0; j < senders.length; j++) {
+          const sender = senders[j];
+          if (sender.track && sender.track.kind === 'video' && cameraTrack) {
+            sender.replaceTrack(cameraTrack);
+          }
         }
-      });
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = localStreamRef.current;
       }
     }
 
     setIsScreenSharing(false);
   };
 
-  // Conclude meeting session (Trigger AI summary & Kanban task extraction)
+  // Handler: host closes meeting and calls status updater API
   const endMeeting = async () => {
-    if (!window.confirm("Are you sure you want to end this meeting for everyone? This will conclude the meeting and generate an AI summary.")) return;
+    const confirmChoice = window.confirm("Are you sure you want to end this meeting for everyone? This will conclude the meeting and generate an AI summary.");
+    if (!confirmChoice) return;
+    
     try {
-      await API.patch(`/meetings/${id}/status`, { status: 'completed' });
+      await API.patch('/meetings/' + id + '/status', { status: 'completed' });
       navigate('/dashboard');
     } catch (err) {
       console.error("Failed to end meeting:", err);
@@ -465,7 +680,7 @@ const MeetingRoomPage: React.FC = () => {
     }
   };
 
-  // Send a text message to meeting chatroom
+  // Handler: send text chat message
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() || !socketRef.current) return;
@@ -478,11 +693,24 @@ const MeetingRoomPage: React.FC = () => {
     };
 
     socketRef.current.emit('send-message', chatData);
-    setMessages(prev => [...prev, { ...chatData, timestamp: new Date().toISOString() }]);
+    
+    setMessages((prev) => {
+      const list = [];
+      for (let i = 0; i < prev.length; i++) {
+        list.push(prev[i]);
+      }
+      list.push({ 
+        sender: chatData.sender, 
+        message: chatData.message, 
+        timestamp: new Date().toISOString() 
+      });
+      return list;
+    });
+
     setMessageInput('');
   };
 
-  // Fallback copying method using a temporary textarea (supports non-secure HTTP and local dev network origins)
+  // Fallback clipboard copying routine
   const fallbackCopyText = (text: string) => {
     const textArea = document.createElement("textarea");
     textArea.value = text;
@@ -508,9 +736,9 @@ const MeetingRoomPage: React.FC = () => {
     document.body.removeChild(textArea);
   };
 
-  // Copy meeting join URL to user clipboard with a robust fallback
+  // Copy meeting link with browser Clipboard API
   const copyMeetingLink = () => {
-    const link = `${window.location.origin}/meeting/${id}`;
+    const link = window.location.origin + '/meeting/' + id;
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(link).then(() => {
         setCopied(true);
@@ -524,19 +752,15 @@ const MeetingRoomPage: React.FC = () => {
     }
   };
 
-  // ==========================================================================
-  // GUEST INVITATION & ACCESS CONTROL ADMIN HANDLERS (Host only)
-  // ==========================================================================
-  
-  // Push updated settings array to backend DB
+  // Handler: send updated security restriction settings array to DB
   const updateAccessSettings = async (newType: 'public' | 'restricted', emails: string[]) => {
     setIsSavingAccess(true);
     try {
-      const { data } = await API.patch(`/meetings/${id}/access`, {
+      const response = await API.patch('/meetings/' + id + '/access', {
         accessType: newType,
         invitedEmails: emails
       });
-      setMeeting(data);
+      setMeeting(response.data);
     } catch (err) {
       console.error("Failed to update access settings:", err);
       alert("Failed to update share settings. Make sure you are the host.");
@@ -545,75 +769,93 @@ const MeetingRoomPage: React.FC = () => {
     }
   };
 
-  // Toggle public vs restricted mode
+  // Toggle privacy mode setting
   const handleToggleAccessType = (newType: 'public' | 'restricted') => {
     if (!meeting) return;
     updateAccessSettings(newType, meeting.invitedEmails || []);
   };
 
-  // Validate format and add guest email to access settings list
+  // Verify and add invited email address to host access list
   const handleAddInviteEmail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!meeting || !newInviteEmail.trim()) return;
     const emailToAdd = newInviteEmail.trim().toLowerCase();
     
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToAdd)) {
+    // Check basic regex email layout structure
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToAdd)) {
       alert("Please enter a valid email address.");
       return;
     }
 
     const currentEmails = meeting.invitedEmails || [];
-    if (currentEmails.includes(emailToAdd)) {
+    if (currentEmails.indexOf(emailToAdd) !== -1) {
       alert("This email is already invited.");
       return;
     }
 
-    const updatedEmails = [...currentEmails, emailToAdd];
+    const updatedEmails = [];
+    for (let i = 0; i < currentEmails.length; i++) {
+      updatedEmails.push(currentEmails[i]);
+    }
+    updatedEmails.push(emailToAdd);
+
     setNewInviteEmail('');
     updateAccessSettings(meeting.accessType, updatedEmails);
   };
 
-  // Remove invited guest email from access settings list
+  // Remove email address from host invite roster list
   const handleRemoveInviteEmail = (emailToRemove: string) => {
     if (!meeting) return;
-    const updatedEmails = (meeting.invitedEmails || []).filter(
-      (email: string) => email !== emailToRemove
-    );
+    
+    const currentEmails = meeting.invitedEmails || [];
+    const updatedEmails = [];
+    for (let i = 0; i < currentEmails.length; i++) {
+      const email = currentEmails[i];
+      if (email !== emailToRemove) {
+        updatedEmails.push(email);
+      }
+    }
+    
     updateAccessSettings(meeting.accessType, updatedEmails);
   };
 
-  // ==========================================================================
-  // INTERFACE RENDERING HELPERS
-  // ==========================================================================
-  
-  // Generate name initials for profile avatars
+  // Helpers to get local user initials
   const getLocalInitials = () => {
     const name = user?.name || guestName || 'ME';
-    return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    return getInitials(name);
   };
 
+  // Helpers to get participant initials
   const getParticipantInitials = (pId: string) => {
     const name = participantNames[pId];
-    if (!name) return 'P';
-    return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    return getInitials(name || 'Participant');
   };
 
-  // Dynamic grid card width class (based on total active caller windows)
+  // Compute layout grid styles class depending on total speakers
   const videoCount = 1 + participants.length;
-  const cardClass = videoCount === 1 ? 'single' : videoCount <= 4 ? '' : 'tiled';
+  let cardClass = '';
+  if (videoCount === 1) {
+    cardClass = 'single';
+  } else if (videoCount > 4) {
+    cardClass = 'tiled';
+  }
 
-  // ==========================================================================
-  // VIEW 1: RESTRICTED ACCESS SCREEN (Shown to uninvited/unauthorized users)
-  // ==========================================================================
+  // Lobby form submit check
+  const handleLobbySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (guestName.trim()) {
+      setIsReadyToJoin(true);
+    }
+  };
+
+  // VIEW 1: Restricted access warning window
   if (restrictionError) {
     return (
       <div className="restricted-container">
         <div className="restricted-card">
           <div className="restricted-icon-wrap">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" />
-            </svg>
+            <Lock size={48} strokeWidth={1.5} />
           </div>
           <h2 className="restricted-title">Access Restricted</h2>
           <p className="restricted-message">{restrictionError}</p>
@@ -621,20 +863,18 @@ const MeetingRoomPage: React.FC = () => {
             <button className="restricted-btn primary" onClick={() => navigate('/dashboard')}>
               Go to Dashboard
             </button>
-            {!user && (
+            {!user ? (
               <button className="restricted-btn secondary" onClick={() => navigate('/auth')}>
                 Sign In / Sign Up
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
     );
   }
 
-  // ==========================================================================
-  // VIEW 2: GUEST LOBBY CARD (Collect name parameter before starting sockets)
-  // ==========================================================================
+  // VIEW 2: Guest name entry lobby modal screen
   if (!isReadyToJoin) {
     return (
       <div className="lobby-container">
@@ -645,9 +885,9 @@ const MeetingRoomPage: React.FC = () => {
           </div>
           <h2 className="lobby-title">Ready to join?</h2>
           <p className="lobby-subtitle">
-            {meeting ? `Enter your name to join "${meeting.title}"` : 'Enter your name to join the meeting room'}
+            {meeting ? ('Enter your name to join "' + meeting.title + '"') : 'Enter your name to join the meeting room'}
           </p>
-          <form onSubmit={(e) => { e.preventDefault(); if (guestName.trim()) setIsReadyToJoin(true); }} className="lobby-form">
+          <form onSubmit={handleLobbySubmit} className="lobby-form">
             <input 
               type="text" 
               value={guestName}
@@ -671,9 +911,7 @@ const MeetingRoomPage: React.FC = () => {
     );
   }
 
-  // ==========================================================================
-  // VIEW 3: MAIN MEETING CONFERENCE ROOM (WebRTC local/remote stream grid)
-  // ==========================================================================
+  // VIEW 3: Main video call conference room layout
   return (
     <div className="meeting-room-container">
       
@@ -683,53 +921,44 @@ const MeetingRoomPage: React.FC = () => {
           <h2>Meeting Room: {meeting?.title || id}</h2>
         </div>
         <div className="header-right">
-          {/* Copy Meeting Link Info Button */}
+          {/* Copy Meeting Link button */}
           <button 
-            className={`copy-link-btn ${copied ? 'copied' : ''}`} 
+            className={'copy-link-btn ' + (copied ? 'copied' : '')} 
             onClick={copyMeetingLink}
             title="Copy meeting link to share"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-              {copied ? (
-                <polyline points="20 6 9 17 4 12" />
-              ) : (
-                <>
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </>
-              )}
-            </svg>
+            {copied ? (
+              <Check size={16} style={{ marginRight: '6px' }} />
+            ) : (
+              <Copy size={16} style={{ marginRight: '6px' }} />
+            )}
             {copied ? 'Copied!' : 'Copy Info'}
           </button>
 
-          {/* 3-Dots Settings Popover Wrapper */}
+          {/* Settings Menu popover button wrapper */}
           <div className="share-settings-wrapper">
             <button
-              className={`settings-dots-btn ${showShareModal ? 'active' : ''}`}
+              className={'settings-dots-btn ' + (showShareModal ? 'active' : '')}
               onClick={() => setShowShareModal(!showShareModal)}
               title="Meeting Share Settings"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-              </svg>
+              <MoreVertical size={20} />
             </button>
 
-            {/* Access Options Dropdown Popover */}
-            {showShareModal && meeting && (
+            {/* Privacy setting dropdown config */}
+            {showShareModal && meeting ? (
               <div className="share-settings-popover">
                 <div className="popover-header">
                   <h4>Access Restrictions</h4>
                   <button className="popover-close-btn" onClick={() => setShowShareModal(false)}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-                    </svg>
+                    <X size={16} />
                   </button>
                 </div>
                 
-                {/* Access Options Toggle Buttons */}
+                {/* Access Options Toggle Pills */}
                 <div className="access-options">
                   <button 
-                    className={`access-pill ${meeting.accessType === 'public' ? 'active' : ''}`}
+                    className={'access-pill ' + (meeting.accessType === 'public' ? 'active' : '')}
                     onClick={() => handleToggleAccessType('public')}
                     disabled={isSavingAccess || meeting.host?._id !== user?._id}
                   >
@@ -737,7 +966,7 @@ const MeetingRoomPage: React.FC = () => {
                     Anyone with link (Public)
                   </button>
                   <button 
-                    className={`access-pill ${meeting.accessType === 'restricted' ? 'active' : ''}`}
+                    className={'access-pill ' + (meeting.accessType === 'restricted' ? 'active' : '')}
                     onClick={() => handleToggleAccessType('restricted')}
                     disabled={isSavingAccess || meeting.host?._id !== user?._id}
                   >
@@ -746,14 +975,14 @@ const MeetingRoomPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Copy Link shortcut inside popover */}
+                {/* Share Link Row */}
                 <div className="popover-share-link">
                   <h5>Meeting Link</h5>
                   <div className="popover-share-row">
                     <input 
                       type="text" 
                       readOnly 
-                      value={`${window.location.origin}/meeting/${id}`} 
+                      value={window.location.origin + '/meeting/' + id} 
                       onClick={(e) => (e.target as HTMLInputElement).select()}
                       title="Click to select all"
                     />
@@ -763,7 +992,7 @@ const MeetingRoomPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Invite Guest list input (Available only to host) */}
+                {/* Invited guest emails registry */}
                 <div className="invited-guests-section">
                   <h5>Invited Guest List</h5>
                   
@@ -784,25 +1013,23 @@ const MeetingRoomPage: React.FC = () => {
                     <p className="viewer-notice">Only the host can modify the guest list.</p>
                   )}
 
-                  {/* Dynamic guest email chips columns */}
+                  {/* List of guest email chips */}
                   <div className="invited-emails-list">
                     {meeting.invitedEmails && meeting.invitedEmails.length > 0 ? (
                       meeting.invitedEmails.map((email: string) => (
                         <div key={email} className="email-chip">
                           <span className="email-text" title={email}>{email}</span>
-                          {meeting.host?._id === user?._id && (
+                          {meeting.host?._id === user?._id ? (
                             <button 
                               type="button" 
                               className="remove-email-btn"
                               onClick={() => handleRemoveInviteEmail(email)}
                               disabled={isSavingAccess}
-                              title={`Remove ${email}`}
+                              title={'Remove ' + email}
                             >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-                              </svg>
+                              <X size={12} />
                             </button>
-                          )}
+                          ) : null}
                         </div>
                       ))
                     ) : (
@@ -811,28 +1038,28 @@ const MeetingRoomPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Loading indicator during network patches */}
-                {isSavingAccess && (
+                {/* Network save layout overlay */}
+                {isSavingAccess ? (
                   <div className="popover-loading-overlay">
                     <div className="popover-spinner"></div>
                   </div>
-                )}
+                ) : null}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
 
-      {/* 3.2: MEET CONTENT AREA */}
+      {/* 3.2: MEETING STREAMS CONTENT AREA */}
       <div className="meeting-content">
         
-        {/* 3.2.1: LEFT PANEL - Video Conference Grid */}
+        {/* 3.2.1: Video Streams layout grid */}
         <div className="video-area">
-          {mediaError && <div className="media-error-alert">{mediaError}</div>}
+          {mediaError ? <div className="media-error-alert">{mediaError}</div> : null}
           
           <div className="videos-grid">
-            {/* Local User Webcam Card */}
-            <div className={`video-card ${cardClass}`}>
+            {/* Local Speaker Video Card */}
+            <div className={'video-card ' + cardClass}>
               {isVideoMuted ? (
                 <div className="avatar-placeholder">
                   <div className="avatar-circle">{getLocalInitials()}</div>
@@ -840,18 +1067,7 @@ const MeetingRoomPage: React.FC = () => {
                 </div>
               ) : (
                 <video 
-                  ref={(el) => {
-                    if (localVideoRef) {
-                      (localVideoRef as any).current = el;
-                    }
-                    if (el) {
-                      // Dynamically bind the active media stream (webcam or screen share) to the video tag
-                      const activeStream = isScreenSharing ? screenStreamRef.current : localStreamRef.current;
-                      if (activeStream && el.srcObject !== activeStream) {
-                        el.srcObject = activeStream;
-                      }
-                    }
-                  }}
+                  ref={localVideoRef}
                   autoPlay 
                   muted 
                   playsInline 
@@ -861,24 +1077,22 @@ const MeetingRoomPage: React.FC = () => {
               
               <div className="video-card-overlay">
                 <span className="name-tag">{user?.name || guestName} (You)</span>
-                {isMicMuted && (
+                {isMicMuted ? (
                   <span className="badge-mic-muted">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17l-9.9-9.9L3.5 2.7l3 3V9c0 3.07 2.26 5.61 5.23 6.07l1.27 1.27c-.89.5-1.91.76-3 .76-3.31 0-6-2.69-6-6H3c0 4.07 3.06 7.43 7 7.93V22h4v-3.07c1.3-.17 2.52-.64 3.59-1.34l3.14 3.14 1.41-1.41-11.16-11.15zM12 4c1.66 0 3 1.34 3 3v4.67l3 3V7c0-3.31-2.69-6-6-6-2.88 0-5.3 2.03-5.87 4.75l2.06 2.06C9.69 5.3 10.74 4 12 4z"/>
-                    </svg>
+                    <MicOff size={14} />
                   </span>
-                )}
+                ) : null}
               </div>
             </div>
 
-            {/* Remote Participants WebRTC Video Cards */}
+            {/* Remote Speakers Video Cards list */}
             {participants.map(pId => {
               const isRemoteVideoMuted = !!remoteMuteStates[pId]?.video;
               const isRemoteMicMuted = !!remoteMuteStates[pId]?.audio;
-              const remoteName = participantNames[pId] || `Participant (${pId.substring(0,4)})`;
+              const remoteName = participantNames[pId] || ('Participant (' + pId.substring(0, 4) + ')');
 
               return (
-                <div key={pId} className={`video-card ${cardClass}`}>
+                <div key={pId} className={'video-card ' + cardClass}>
                   {isRemoteVideoMuted ? (
                     <div className="avatar-placeholder">
                       <div className="avatar-circle">{getParticipantInitials(pId)}</div>
@@ -886,18 +1100,9 @@ const MeetingRoomPage: React.FC = () => {
                     </div>
                   ) : (
                     remoteStreams[pId] ? (
-                      <video 
-                        autoPlay 
-                        playsInline 
-                        className="meet-video-stream remote"
-                        ref={(el) => {
-                          if (el && el.srcObject !== remoteStreams[pId]) {
-                            el.srcObject = remoteStreams[pId];
-                          }
-                        }}
-                      />
+                      <RemoteVideo stream={remoteStreams[pId]} />
                     ) : (
-                      // Display dynamic glassmorphic spinner during connection negotiation
+                      // Connecting spinner overlay
                       <div className="video-connecting">
                         <div className="video-spinner"></div>
                         <span>Connecting to {remoteName}...</span>
@@ -907,13 +1112,11 @@ const MeetingRoomPage: React.FC = () => {
 
                   <div className="video-card-overlay">
                     <span className="name-tag">{remoteName}</span>
-                    {isRemoteMicMuted && (
+                    {isRemoteMicMuted ? (
                       <span className="badge-mic-muted">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17l-9.9-9.9L3.5 2.7l3 3V9c0 3.07 2.26 5.61 5.23 6.07l1.27 1.27c-.89.5-1.91.76-3 .76-3.31 0-6-2.69-6-6H3c0 4.07 3.06 7.43 7 7.93V22h4v-3.07c1.3-.17 2.52-.64 3.59-1.34l3.14 3.14 1.41-1.41-11.16-11.15zM12 4c1.66 0 3 1.34 3 3v4.67l3 3V7c0-3.31-2.69-6-6-6-2.88 0-5.3 2.03-5.87 4.75l2.06 2.06C9.69 5.3 10.74 4 12 4z"/>
-                        </svg>
+                        <MicOff size={14} />
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );
@@ -921,39 +1124,35 @@ const MeetingRoomPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3.2.2: RIGHT PANEL - sliding side drawer (Chat / Active User list) */}
-        {activeSidebar !== null && (
+        {/* 3.2.2: Chat / Roster sliding drawer sidebar panel */}
+        {activeSidebar !== null ? (
           <div className="meet-sidebar-drawer">
             <div className="drawer-header">
               <h3>{activeSidebar === 'chat' ? 'In-call Messages' : 'People'}</h3>
               <button className="close-drawer-btn" onClick={() => setActiveSidebar(null)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-                </svg>
+                <X size={20} />
               </button>
             </div>
 
-            {/* Chat Messages Log Layout */}
+            {/* 3.2.2.1: Chat view layout */}
             {activeSidebar === 'chat' ? (
               <div className="drawer-chat-container">
                 <div className="chat-notice-banner">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="banner-icon">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
+                  <Shield size={14} className="banner-icon" />
                   <span>Messages are only visible to people in the call and are deleted when the call ends.</span>
                 </div>
                 <div className="drawer-chat-messages">
                   {messages.map((msg, index) => {
                     const isOwn = msg.sender === (user?.name || guestName);
-                    const initials = msg.sender.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                    const messageInitials = getInitials(msg.sender);
+                    
                     return (
-                      <div key={index} className={`meet-chat-msg-row ${isOwn ? 'own' : ''}`}>
-                        {!isOwn && (
+                      <div key={index} className={'meet-chat-msg-row ' + (isOwn ? 'own' : '')}>
+                        {!isOwn ? (
                           <div className="chat-msg-avatar" title={msg.sender}>
-                            {initials}
+                            {messageInitials}
                           </div>
-                        )}
+                        ) : null}
                         <div className="chat-msg-bubble-wrap">
                           <div className="chat-msg-meta">
                             <span className="chat-msg-sender">{isOwn ? 'You' : msg.sender}</span>
@@ -963,30 +1162,28 @@ const MeetingRoomPage: React.FC = () => {
                           </div>
                           <p className="meet-chat-text">{msg.message}</p>
                         </div>
-                        {isOwn && (
+                        {isOwn ? (
                           <div className="chat-msg-avatar own" title="You">
-                            {initials}
+                            {messageInitials}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     );
                   })}
                   
-                  {/* Premium Centered Empty Chat State Placeholder */}
-                  {messages.length === 0 && (
+                  {/* Empty chat placeholder container */}
+                  {messages.length === 0 ? (
                     <div className="empty-chat-container">
                       <div className="empty-chat-icon-wrap">
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
+                        <MessageSquare size={36} strokeWidth={1.5} />
                       </div>
                       <h4>No messages yet</h4>
                       <p>Send a message to start the conversation with others in this call.</p>
                     </div>
-                  )}
+                  ) : null}
                 </div>
                 
-                {/* Chat message submission input form */}
+                {/* Chat text box submit form */}
                 <form onSubmit={sendMessage} className="meet-chat-input-form">
                   <input 
                     type="text" 
@@ -995,17 +1192,14 @@ const MeetingRoomPage: React.FC = () => {
                     placeholder="Send a message..."
                   />
                   <button type="submit" disabled={!messageInput.trim()} className="send-msg-btn" title="Send message">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
+                    <Send size={18} />
                   </button>
                 </form>
               </div>
             ) : (
-              // Active Call User List Layout
+              // 3.2.2.2: Participant Roster view layout
               <div className="participants-drawer-list">
-                {/* Meeting Host Item (Sticky first entry) */}
+                {/* Meeting Host item row (Always first element) */}
                 <div className="participant-item">
                   <div className="participant-item-left">
                     <div className="participant-item-avatar">
@@ -1018,9 +1212,9 @@ const MeetingRoomPage: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Other remote participants joined */}
+                {/* Active attendees listing */}
                 {participants.map(pId => {
-                  const name = participantNames[pId] || `Guest (${pId.substring(0,4)})`;
+                  const name = participantNames[pId] || ('Guest (' + pId.substring(0, 4) + ')');
                   const isRemoteMicMuted = !!remoteMuteStates[pId]?.audio;
                   return (
                     <div key={pId} className="participant-item">
@@ -1031,14 +1225,8 @@ const MeetingRoomPage: React.FC = () => {
                         <span className="participant-item-name">{name}</span>
                       </div>
                       <div className="participant-item-status">
-                        <span className={`participant-mic-status ${isRemoteMicMuted ? 'muted' : ''}`}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                            {isRemoteMicMuted ? (
-                              <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17l-9.9-9.9L3.5 2.7l3 3V9c0 3.07 2.26 5.61 5.23 6.07l1.27 1.27c-.89.5-1.91.76-3 .76-3.31 0-6-2.69-6-6H3c0 4.07 3.06 7.43 7 7.93V22h4v-3.07c1.3-.17 2.52-.64 3.59-1.34l3.14 3.14 1.41-1.41-11.16-11.15z"/>
-                            ) : (
-                              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
-                            )}
-                          </svg>
+                        <span className={'participant-mic-status ' + (isRemoteMicMuted ? 'muted' : '')}>
+                          {isRemoteMicMuted ? <MicOff size={18} /> : <Mic size={18} />}
                         </span>
                       </div>
                     </div>
@@ -1047,84 +1235,64 @@ const MeetingRoomPage: React.FC = () => {
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* 3.3: FLOATING CENTER CONTROLS BAR (Google Meet Style actions) */}
+      {/* 3.3: FLOATING CENTER CONTROLS BAR */}
       <div className="controls-bar">
-        {/* Toggle local audio mute */}
+        {/* Toggle Audio Mute */}
         <button 
-          className={`control-btn ${isMicMuted ? 'muted' : ''}`} 
+          className={'control-btn ' + (isMicMuted ? 'muted' : '')} 
           onClick={toggleMic}
           data-tooltip={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            {isMicMuted ? (
-              <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17l-9.9-9.9L3.5 2.7l3 3V9c0 3.07 2.26 5.61 5.23 6.07l1.27 1.27c-.89.5-1.91.76-3 .76-3.31 0-6-2.69-6-6H3c0 4.07 3.06 7.43 7 7.93V22h4v-3.07c1.3-.17 2.52-.64 3.59-1.34l3.14 3.14 1.41-1.41-11.16-11.15zM12 4c1.66 0 3 1.34 3 3v4.67l3 3V7c0-3.31-2.69-6-6-6-2.88 0-5.3 2.03-5.87 4.75l2.06 2.06C9.69 5.3 10.74 4 12 4z"/>
-            ) : (
-              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
-            )}
-          </svg>
+          {isMicMuted ? <MicOff size={20} /> : <Mic size={20} />}
         </button>
 
-        {/* Toggle local camera video mute */}
+        {/* Toggle Camera Mute */}
         <button 
-          className={`control-btn ${isVideoMuted ? 'muted' : ''}`} 
+          className={'control-btn ' + (isVideoMuted ? 'muted' : '')} 
           onClick={toggleVideo}
           data-tooltip={isVideoMuted ? "Turn on Camera" : "Turn off Camera"}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            {isVideoMuted ? (
-              <path d="M18 10.48V6c0-1.1-.9-2-2-2H6.83l2 2H16v7.17l2 2v-1.65l4 3.98v-11l-4 3.98zM2.71 1.58L1.29 3l3.29 3.29C4.21 6.56 4 7.26 4 8v10c0 1.1.9 2 2 2h12.17l3.54 3.54 1.41-1.41-11.16-11.15zM6 18V8.83L15.17 18H6z"/>
-            ) : (
-              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-            )}
-          </svg>
+          {isVideoMuted ? <VideoOff size={20} /> : <Video size={20} />}
         </button>
 
-        {/* Toggle presentation screen sharing */}
+        {/* Share Screen presentation */}
         <button 
-          className={`control-btn ${isScreenSharing ? 'active' : ''}`} 
+          className={'control-btn ' + (isScreenSharing ? 'active' : '')} 
           onClick={isScreenSharing ? stopScreenShare : shareScreen}
           data-tooltip={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.11-.9-2-2-2H4c-1.11 0-2 .89-2 2v10c0 1.1.89 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
-          </svg>
+          <Monitor size={20} />
         </button>
 
-        {/* Toggle messaging sliding drawer */}
+        {/* Toggle sliding Chat Drawer */}
         <button 
-          className={`control-btn ${activeSidebar === 'chat' ? 'active' : ''}`} 
+          className={'control-btn ' + (activeSidebar === 'chat' ? 'active' : '')} 
           onClick={() => setActiveSidebar(prev => prev === 'chat' ? null : 'chat')}
           data-tooltip="In-call Messages"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-          </svg>
+          <MessageSquare size={20} />
         </button>
 
-        {/* Toggle callers list sliding drawer */}
+        {/* Toggle sliding Attendee roster drawer */}
         <button 
-          className={`control-btn ${activeSidebar === 'participants' ? 'active' : ''}`} 
+          className={'control-btn ' + (activeSidebar === 'participants' ? 'active' : '')} 
           onClick={() => setActiveSidebar(prev => prev === 'participants' ? null : 'participants')}
           data-tooltip="People"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-          </svg>
+          <Users size={20} />
         </button>
 
-        {/* Leave/End call connection */}
+        {/* Call end button (Host ends meeting for all vs Guest exits room) */}
         {meeting && user && meeting.host?._id === user._id && meeting.status !== 'completed' ? (
           <button 
             className="control-btn danger" 
             onClick={endMeeting}
             data-tooltip="End Meeting for Everyone"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 9c-2.2 0-4.3.4-6.2 1.1-.5.2-.8.6-.8 1.1v2.8c0 .5.3.9.7 1.1 1.8.9 3.8 1.4 5.9 1.4 2.1 0 4.1-.5 5.9-1.4.4-.2.7-.6.7-1.1v-2.8c0-.5-.3-.9-.8-1.1-1.9-.7-4-1.1-6.2-1.1z"/>
-            </svg>
+            <PhoneOff size={20} />
           </button>
         ) : (
           <button 
@@ -1132,9 +1300,7 @@ const MeetingRoomPage: React.FC = () => {
             onClick={() => navigate('/dashboard')}
             data-tooltip="Leave Call"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 9c-2.2 0-4.3.4-6.2 1.1-.5.2-.8.6-.8 1.1v2.8c0 .5.3.9.7 1.1 1.8.9 3.8 1.4 5.9 1.4 2.1 0 4.1-.5 5.9-1.4.4-.2.7-.6.7-1.1v-2.8c0-.5-.3-.9-.8-1.1-1.9-.7-4-1.1-6.2-1.1z"/>
-            </svg>
+            <PhoneOff size={20} />
           </button>
         )}
       </div>
@@ -1144,3 +1310,4 @@ const MeetingRoomPage: React.FC = () => {
 };
 
 export default MeetingRoomPage;
+

@@ -1,0 +1,286 @@
+/* ── Analytics Component Styles ─────────────────────────────────────────── */
+
+.analytics-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeUp 0.3s ease-out forwards;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Loading State ──────────────────────────────────────────────────────── */
+.analytics-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.analytics-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-light);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Stat Cards Grid ────────────────────────────────────────────────────── */
+.analytics-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .analytics-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 500px) {
+  .analytics-stat-grid { grid-template-columns: 1fr; }
+}
+
+.analytics-stat-card {
+  background: #fff;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.analytics-stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.stat-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-icon-wrap.blue   { background: rgba(96, 165, 250, 0.12); color: #3b82f6; }
+.stat-icon-wrap.green  { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.stat-icon-wrap.amber  { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.stat-icon-wrap.purple { background: rgba(139, 92, 246, 0.12); color: #8b5cf6; }
+
+.stat-card-value {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 0.2rem;
+}
+
+.stat-card-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── Charts Row ─────────────────────────────────────────────────────────── */
+.analytics-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 800px) {
+  .analytics-charts-row { grid-template-columns: 1fr; }
+}
+
+/* ── Analytics Card ─────────────────────────────────────────────────────── */
+.analytics-card {
+  background: #fff;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.analytics-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.analytics-card-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.card-header-icon {
+  color: var(--text-secondary);
+}
+
+.analytics-empty {
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* ── Bar Chart SVG ──────────────────────────────────────────────────────── */
+.bar-svg {
+  width: 100%;
+  overflow: visible;
+}
+
+.bar-rect {
+  transition: opacity 0.2s;
+}
+
+.bar-active { fill: var(--accent-primary); opacity: 0.85; }
+.bar-empty  { fill: rgba(15, 23, 42, 0.06); }
+
+.bar-label-top {
+  font-size: 10px;
+  fill: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+}
+
+.bar-label-day {
+  font-size: 10px;
+  fill: var(--text-tertiary);
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Donut Chart ────────────────────────────────────────────────────────── */
+.donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.donut-svg {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.donut-total {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  fill: var(--text-primary);
+}
+
+.donut-label {
+  font-size: 10px;
+  fill: var(--text-tertiary);
+  font-family: 'Inter', sans-serif;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.legend-count {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Task Progress Card ─────────────────────────────────────────────────── */
+.analytics-task-card {
+  width: 100%;
+}
+
+.task-progress-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.task-progress-pct {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.task-progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-surface);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.task-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 99px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-chips {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.task-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.chip-todo     { background: rgba(239,68,68,0.08);  color: #dc2626; }
+.chip-progress { background: rgba(245,158,11,0.08); color: #d97706; }
+.chip-done     { background: rgba(16,185,129,0.08); color: #059669; }

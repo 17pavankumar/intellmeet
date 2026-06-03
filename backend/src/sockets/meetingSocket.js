@@ -1,51 +1,74 @@
 /**
- * Socket.io Meeting Event Handler
- * Sets up listeners for WebSocket connections to handle real-time chat
- * and WebRTC peer-to-peer connection signaling.
+ * Setup WebSocket listeners on the Socket.io instance.
+ * This coordinates real-time chat messages and WebRTC signaling (offers, answers, candidates).
  */
 const setupMeetingSocket = (io) => {
-  // Listen for new client connection events
+  // Listen for whenever a user client connects to our Socket.io server
   io.on('connection', (socket) => {
-    console.log(`🔌 User connected: ${socket.id}`);
+    // Log the unique socket ID representing this user session
+    console.log('User connected: ' + socket.id);
 
-    // Event: User joins a specific meeting room
+    // Listener: A participant joins a meeting room
     socket.on('join-meeting', async (data) => {
-      // Support both string payload (meetingId) and object payload ({ meetingId, userId, name })
-      const meetingId = typeof data === 'object' ? data.meetingId : data;
-      const userId = typeof data === 'object' ? data.userId : null;
-      const name = typeof data === 'object' ? data.name : null;
+      // Initialize meeting room parameters
+      let meetingId = '';
+      let userId = null;
+      let name = null;
 
-      // Put the socket channel into a room named after the meeting ID
+      // Extract details depending on whether the payload is an object or string
+      if (typeof data === 'object' && data !== null) {
+        meetingId = data.meetingId;
+        userId = data.userId;
+        name = data.name;
+      } else {
+        meetingId = data;
+      }
+
+      // Add this client's socket session to the channel room named after the meeting ID
       socket.join(meetingId);
-      console.log(`User ${socket.id} joined meeting: ${meetingId}`);
+      console.log('User ' + socket.id + ' joined meeting: ' + meetingId);
       
-      // Notify all other clients already inside this meeting room that a new user has joined
-      socket.to(meetingId).emit('user-joined', { socketId: socket.id, userId, name });
+      // Notify all other clients in the same room that a new participant has joined
+      socket.to(meetingId).emit('user-joined', { 
+        socketId: socket.id, 
+        userId: userId, 
+        name: name 
+      });
 
-      // Save participant to MongoDB if userId is provided
+      // If a valid userId exists, persist their participant status to the MongoDB database
       if (userId) {
         try {
+          // Import the Meeting model to query/update meeting documents
           const Meeting = require('../models/meetingModel');
+          
+          // Use Mongoose addToSet to add user to participant list uniquely
           await Meeting.findByIdAndUpdate(meetingId, {
-            $addToSet: { participants: userId } // Add to participants list without duplication
+            $addToSet: { participants: userId }
           });
-          console.log(`Added participant ${userId} to meeting ${meetingId} in DB`);
+          console.log('Added participant ' + userId + ' to meeting ' + meetingId + ' in database');
         } catch (err) {
-          console.error(`Failed to add participant to DB:`, err.message);
+          // Print error message if DB update fails
+          console.error('Failed to add participant to DB:', err.message);
         }
       }
     });
 
-    // Event: User sends a chat message inside a meeting room
-    socket.on('send-message', async ({ meetingId, message, sender, senderId }) => {
-      // Broadcast the received message object to all other participants in the same meeting room
+    // Listener: A user sends a text chat message
+    socket.on('send-message', async (data) => {
+      // Extract properties from payload explicitly
+      const meetingId = data.meetingId;
+      const message = data.message;
+      const sender = data.sender;
+      const senderId = data.senderId;
+
+      // Broadcast message to everyone else in the meeting room
       socket.to(meetingId).emit('receive-message', { 
-        message, 
-        sender, 
+        message: message, 
+        sender: sender, 
         timestamp: new Date() 
       });
 
-      // Persist the message to MongoDB
+      // Save the message content to the Mongoose meeting document
       try {
         const Meeting = require('../models/meetingModel');
         await Meeting.findByIdAndUpdate(meetingId, {
@@ -58,63 +81,96 @@ const setupMeetingSocket = (io) => {
             }
           }
         });
-        console.log(`Saved message from ${sender} in meeting ${meetingId} to DB`);
+        console.log('Saved message from ' + sender + ' in meeting ' + meetingId + ' to database');
       } catch (err) {
-        console.error(`Failed to save message to DB:`, err.message);
+        console.error('Failed to save message to DB:', err.message);
       }
     });
 
-    // Event: User explicitly leaves a meeting room
+    // Listener: A client leaves the meeting room explicitly
     socket.on('leave-meeting', (meetingId) => {
-      // Remove the socket channel from the meeting room
+      // Remove this client's socket from the room channel
       socket.leave(meetingId);
       
-      // Notify other participants in the room that this user has left
+      // Notify other clients in the room that this user has left
       socket.to(meetingId).emit('user-left', { socketId: socket.id });
     });
 
-    // Event: User toggles audio/video mute state
-    socket.on('toggle-mute', ({ meetingId, type, isMuted }) => {
-      // Broadcast this mute change to all other participants in the room
-      socket.to(meetingId).emit('user-mute-state', { socketId: socket.id, type, isMuted });
+    // Listener: A client changes their local device mute state (audio microphone or video camera)
+    socket.on('toggle-mute', (data) => {
+      const meetingId = data.meetingId;
+      const type = data.type;
+      const isMuted = data.isMuted;
+
+      // Broadcast this user's new mute state to all other room members
+      socket.to(meetingId).emit('user-mute-state', { 
+        socketId: socket.id, 
+        type: type, 
+        isMuted: isMuted 
+      });
     });
 
-    // Event: User disconnects from the WebSocket server (e.g. closed browser tab)
+    // Listener: A client disconnects completely (e.g. closes browser window)
     socket.on('disconnect', () => {
-      console.log(`❌ User disconnected: ${socket.id}`);
+      console.log('User disconnected: ' + socket.id);
     });
 
     // ----- WebRTC Peer-to-Peer Signaling Events -----
-    // WebRTC connection setup requires clients to trade "offers", "answers", and "ICE candidates"
-    // to establish a direct connection with each other. The backend acts as a relay post here.
+    // Peer-to-peer WebRTC connections require clients to swap local media session descriptions 
+    // and network pathways (ICE Candidates) through a signaling intermediary.
+    
+    // Relay WebRTC SDP Offer from caller to target peer
+    socket.on('webrtc-offer', (data) => {
+      // Extract target ID and WebRTC parameters explicitly
+      const targetSocketId = data.targetSocketId;
+      const offer = data.offer;
+      const senderName = data.senderName;
+      const isMicMuted = data.isMicMuted;
+      const isVideoMuted = data.isVideoMuted;
 
-    // 1. Relays WebRTC SDP Offer from a calling client to a target client.
-    //    We spread the full payload so senderName, isMicMuted, isVideoMuted all reach the recipient.
-    socket.on('webrtc-offer', ({ targetSocketId, ...rest }) => {
+      // Relay parameters to the designated target client
       socket.to(targetSocketId).emit('webrtc-offer', {
         senderSocketId: socket.id,
-        ...rest  // Passes offer, senderName, isMicMuted, isVideoMuted through intact
+        offer: offer,
+        senderName: senderName,
+        isMicMuted: isMicMuted,
+        isVideoMuted: isVideoMuted
       });
     });
 
-    // 2. Relays WebRTC SDP Answer back from target client to calling client.
-    //    Same spread approach — keeps all metadata fields intact.
-    socket.on('webrtc-answer', ({ targetSocketId, ...rest }) => {
+    // Relay WebRTC SDP Answer back from target peer to caller
+    socket.on('webrtc-answer', (data) => {
+      // Extract target ID and parameters explicitly
+      const targetSocketId = data.targetSocketId;
+      const answer = data.answer;
+      const senderName = data.senderName;
+      const isMicMuted = data.isMicMuted;
+      const isVideoMuted = data.isVideoMuted;
+
+      // Relay parameters to the designated target client
       socket.to(targetSocketId).emit('webrtc-answer', {
         senderSocketId: socket.id,
-        ...rest  // Passes answer, senderName, isMicMuted, isVideoMuted through intact
+        answer: answer,
+        senderName: senderName,
+        isMicMuted: isMicMuted,
+        isVideoMuted: isVideoMuted
       });
     });
 
-    // 3. Relays WebRTC ICE Candidates (network routes) between peers
-    socket.on('webrtc-ice-candidate', ({ targetSocketId, candidate }) => {
+    // Relay WebRTC ICE Candidates (network routes) between peers
+    socket.on('webrtc-ice-candidate', (data) => {
+      const targetSocketId = data.targetSocketId;
+      const candidate = data.candidate;
+
+      // Send routing paths to designated receiver
       socket.to(targetSocketId).emit('webrtc-ice-candidate', {
         senderSocketId: socket.id,
-        candidate
+        candidate: candidate
       });
     });
   });
 };
 
-// Export the socket setup function
+// Export setup function
 module.exports = setupMeetingSocket;
+

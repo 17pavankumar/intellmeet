@@ -1,5 +1,5 @@
 import React from 'react';
-import useTaskStore from '../store/taskStore';
+import { useTasks } from '../hooks/useTasks';
 import TaskCard from './TaskCard';
 import './TasksBoard.css';
 
@@ -8,8 +8,8 @@ import './TasksBoard.css';
  * Renders a Kanban board structure representing task state columns: To Do, In Progress, Done.
  */
 const TasksBoard: React.FC = () => {
-  // Retrieve the global tasks state array from task global store
-  const { tasks } = useTaskStore();
+  // Retrieve the tasks state array using React Query hook
+  const { data: tasks = [] } = useTasks();
 
   // Filter tasks into their respective columns based on status values
   const todoTasks = tasks.filter(t => t.status === 'todo');
