@@ -69,7 +69,7 @@ You push code to GitHub (main branch)
 1. Click **Connect** → **Drivers**.
 2. Copy the connection string.
 3. Replace `<password>` with the password you copied in Step 1.
-4. Add the database name — append `/intellmeet` before the `?` parameters:
+4. Add the database name — insert `intellmeet` between the `/` and `?` in the connection string:
    `mongodb+srv://intellmeet_user:YOURPASSWORD@cluster0.xxxxx.mongodb.net/intellmeet?retryWrites=true&w=majority`
 5. **Save this string** — you'll need it in the next step.
 

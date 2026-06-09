@@ -97,7 +97,28 @@ setupMeetingSocket(io);
 const PORT = process.env.PORT || 5000;
 
 // Set the MongoDB connection URI string from environment variables or default to a local MongoDB database
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/intellmeet';
+let MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/intellmeet';
+
+// Helper function to auto-encode special characters (like '@' or ':') in the connection credentials
+const sanitizeMongoUri = (uri) => {
+  if (!uri) return uri;
+  try {
+    const match = uri.match(/^(mongodb(?:\+srv)?:\/\/)([^:]+):(.*)@([^@/]+)(.*)$/);
+    if (match) {
+      const [_, protocol, username, password, hostAndDb, options] = match;
+      const decodedPassword = decodeURIComponent(password);
+      const encodedPassword = encodeURIComponent(decodedPassword);
+      const decodedUsername = decodeURIComponent(username);
+      const encodedUsername = encodeURIComponent(decodedUsername);
+      return `${protocol}${encodedUsername}:${encodedPassword}@${hostAndDb}${options}`;
+    }
+  } catch (err) {
+    console.error('Failed to parse/sanitize MONGO_URI:', err.message);
+  }
+  return uri;
+};
+
+MONGO_URI = sanitizeMongoUri(MONGO_URI);
 
 // Connect to MongoDB database via mongoose
 mongoose

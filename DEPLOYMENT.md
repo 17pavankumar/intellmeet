@@ -139,7 +139,7 @@ docker-compose down
 3. Under **Network Access**, add a rule to allow connections from anywhere (`0.0.0.0/0`) since Render's outgoing IPs change dynamically.
 4. Under **Database Access**, create a user (e.g., `intellmeet_db_user`) with read/write permissions and copy the password.
 5. In the cluster overview, click **Connect** → **Drivers** and copy your connection string.
-6. Replace `<password>` with your database user's password and append `/intellmeet` before the query parameters:
+6. Replace `<password>` with your database user's password and insert `intellmeet` between the `/` and `?` in the connection string:
    `mongodb+srv://intellmeet_db_user:<password>@cluster0.xxxxx.mongodb.net/intellmeet?retryWrites=true&w=majority`
 
 ### Step 2: Deploy Backend to Render

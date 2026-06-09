@@ -34,16 +34,7 @@ const AuthPage: React.FC = () => {
     }
   };
 
-  // State to track window width for dynamic button resizing
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Initialize Google Sign-in client flow with dynamic width fitting
+  // Initialize Google Sign-in client flow with dynamic width fitting and observer
   useEffect(() => {
     const initializeGoogleSignIn = () => {
       if ((window as any).google?.accounts?.id) {
@@ -55,13 +46,19 @@ const AuthPage: React.FC = () => {
         
         const btnElement = document.getElementById("google-signin-btn");
         if (btnElement) {
-          // Dynamically compute width of the form element so it matches input fields
+          // Clear container content to prevent duplication/overlapping iframe elements
+          btnElement.innerHTML = '';
+          
+          // Dynamically compute width of the form element to match input fields
           const formElement = document.querySelector(".auth-form");
           const computeWidth = formElement ? formElement.clientWidth : 360;
           
           (window as any).google.accounts.id.renderButton(btnElement, {
             theme: "outline",
             size: "large",
+            shape: "rectangular",
+            logo_alignment: "left",
+            text: "continue_with",
             width: Math.min(Math.max(computeWidth, 200), 400),
           });
         }
@@ -69,6 +66,16 @@ const AuthPage: React.FC = () => {
     };
 
     initializeGoogleSignIn();
+
+    // Resize observer to handle changes in container size smoothly without extra re-renders
+    const formElement = document.querySelector(".auth-form");
+    let resizeObserver: ResizeObserver | null = null;
+    if (formElement) {
+      resizeObserver = new ResizeObserver(() => {
+        initializeGoogleSignIn();
+      });
+      resizeObserver.observe(formElement);
+    }
 
     // Check periodically in case Google script takes time to load
     const interval = setInterval(() => {
@@ -78,8 +85,13 @@ const AuthPage: React.FC = () => {
       }
     }, 500);
 
-    return () => clearInterval(interval);
-  }, [isLogin, windowWidth]);
+    return () => {
+      clearInterval(interval);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [isLogin]);
 
   // Handler for form submit events
   const handleSubmit = async (e: React.FormEvent) => {
