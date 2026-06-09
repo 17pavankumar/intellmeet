@@ -1,48 +1,217 @@
-name: IntellMeet CI
+# ============================================================
+# IntellMeet — CI/CD Pipeline
+# ============================================================
+# This workflow runs automatically on every push to 'main'
+# and on every pull request targeting 'main'.
+#
+# JOBS:
+#   1. ci             → Build frontend + validate backend
+#   2. deploy-backend → Trigger Render redeploy (main only)
+#   3. deploy-frontend→ Deploy to Vercel (main only)
+#
+# REQUIRED GITHUB SECRETS (Settings → Secrets → Actions):
+#   RENDER_DEPLOY_HOOK_URL  → From Render: Settings → Deploy Hook
+#   VERCEL_TOKEN            → From vercel.com/account/tokens
+#   VERCEL_ORG_ID           → From frontend/.vercel/project.json
+#   VERCEL_PROJECT_ID       → From frontend/.vercel/project.json
+# ============================================================
 
+name: IntellMeet CI/CD
+
+# Trigger this workflow on push to main/master and on pull requests
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
 
+# ============================================================
+# JOB 1: CI — Build and Validate
+# Runs on every push and every pull request.
+# Both sub-steps (frontend build + backend validate) run in
+# parallel to save time.
+# ============================================================
 jobs:
-  frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
+  ci:
+    name: CI — Build & Validate
+    runs-on: ubuntu-latest   # Use a fresh Ubuntu virtual machine
+
+    strategy:
+      # Run both matrix items in parallel
+      matrix:
+        include:
+          - component: frontend
+            working_directory: frontend
+            cache_path: frontend/package-lock.json
+          - component: backend
+            working_directory: backend
+            cache_path: backend/package-lock.json
+
     steps:
+      # Step 1: Download the full repository code onto the runner machine
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # Step 2: Install Node.js 20 and enable npm dependency caching
+      # Caching speeds up future runs by reusing already-downloaded packages
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.cache_path }}
+
+      # Step 3: Install all npm packages listed in package.json
+      # 'npm ci' is stricter than 'npm install' — it uses package-lock.json exactly
+      - name: Install Dependencies
+        working-directory: ${{ matrix.working_directory }}
+        run: npm ci
+
+      # Step 4 (Frontend only): Run the Vite production build
+      # This catches any TypeScript type errors or missing imports
+      - name: Build Frontend (TypeScript + Vite)
+        if: matrix.component == 'frontend'
+        working-directory: frontend
+        run: npm run build
+        env:
+          # Provide dummy values so Vite doesn't complain about missing env vars
+          VITE_API_URL: https://intellmeet-api.onrender.com/api
+          VITE_SOCKET_URL: https://intellmeet-api.onrender.com
+
+      # Step 4 (Backend only): Run Node.js syntax checker on core files
+      # This catches JavaScript syntax errors without needing to start the server
+      - name: Syntax Check Backend
+        if: matrix.component == 'backend'
+        working-directory: backend
+        run: |
+          node -c server.js
+          node -c src/controllers/meetingController.js
+          node -c src/controllers/authController.js
+          node -c src/controllers/taskController.js
+          node -c src/sockets/meetingSocket.js
+          node -c src/services/aiService.js
+          node -c src/middleware/authMiddleware.js
+          echo "✅ All backend files passed syntax check"
+
+# ============================================================
+# JOB 2: Deploy Backend to Render
+# Only runs when:
+#   - The 'ci' job above passed (needs: ci)
+#   - The push is directly to the main branch (not a PR)
+# ============================================================
+  deploy-backend:
+    name: Deploy Backend → Render
+    runs-on: ubuntu-latest
+    needs: ci   # Only run this job AFTER 'ci' job passes
+
+    # Skip this job on pull requests — only deploy on direct pushes to main
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+      # Step 1: Trigger Render to redeploy by calling the Deploy Hook URL
+      # Render will pull the latest code from GitHub and restart the server
+      - name: Trigger Render Redeploy
+        run: |
+          echo "🚀 Triggering Render backend deployment..."
+          # Call the Render deploy hook URL — this starts a new deployment on Render
+          # The URL is stored in GitHub Secrets so it's never exposed in logs
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            --request POST \
+            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+
+          # Check if Render accepted the request (201 = deployment triggered)
+          if [ "$response" = "201" ]; then
+            echo "✅ Render deployment triggered successfully (HTTP $response)"
+          else
+            echo "❌ Render deployment trigger failed (HTTP $response)"
+            exit 1
+          fi
+
+      # Step 2: Wait briefly and check if the backend API responds
+      - name: Wait for Backend to Start
+        run: |
+          echo "⏳ Waiting 30 seconds for Render to start the server..."
+          sleep 30
+          echo "🔍 Checking backend health..."
+          # Poll the backend root endpoint up to 5 times
+          for i in 1 2 3 4 5; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 10 \
+              https://intellmeet-api.onrender.com/ || echo "000")
+            echo "  Attempt $i: HTTP $response"
+            if [ "$response" = "200" ]; then
+              echo "✅ Backend is live and responding!"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "⚠️ Backend health check timed out — check Render dashboard"
+          # Don't fail the pipeline if health check times out (Render free tier is slow)
+          exit 0
+
+# ============================================================
+# JOB 3: Deploy Frontend to Vercel
+# Only runs when:
+#   - The 'ci' job above passed (needs: ci)
+#   - The push is directly to the main branch (not a PR)
+# ============================================================
+  deploy-frontend:
+    name: Deploy Frontend → Vercel
+    runs-on: ubuntu-latest
+    needs: ci   # Only run this job AFTER 'ci' job passes
+
+    # Skip this job on pull requests — only deploy on direct pushes to main
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+      # Step 1: Download the repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Node.js
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Dependencies
+      # Step 3: Install frontend dependencies
+      - name: Install Frontend Dependencies
         working-directory: frontend
         run: npm ci
 
-      - name: Build Frontend
+      # Step 4: Install Vercel CLI globally so we can run 'vercel' commands
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      # Step 5: Pull Vercel project settings (vercel.json config, env vars etc.)
+      # Uses secrets stored in GitHub to authenticate with Vercel
+      - name: Pull Vercel Project Settings
         working-directory: frontend
-        run: npm run build
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-  backend:
-    name: Validate Backend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      # Step 6: Build the Vite app specifically for Vercel's production environment
+      # Vercel injects the env variables set in the Vercel dashboard
+      - name: Build for Production (Vercel)
+        working-directory: frontend
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install Dependencies
-        working-directory: backend
-        run: npm ci
+      # Step 7: Deploy the built files to Vercel's global CDN
+      # --prebuilt means we skip re-building (already done in step 6)
+      - name: Deploy to Vercel Production
+        working-directory: frontend
+        run: |
+          echo "🚀 Deploying frontend to Vercel..."
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "✅ Frontend deployed successfully!"
+          echo "🌐 Live URL: $url"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
