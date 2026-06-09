@@ -346,3 +346,154 @@
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 1.75rem;
 }
+
+/* ---- Mobile Top Bar ---- */
+.mobile-top-bar {
+  display: none;
+  background: #F8FAFC;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 0.75rem 1.25rem;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.hamburger-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s;
+}
+
+.hamburger-btn:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.mobile-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.mobile-bar-logo {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #0F172A, #334155);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #FFFFFF;
+}
+
+.sidebar-close-btn {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 998;
+}
+
+/* ---- Mobile Responsive Queries ---- */
+@media (max-width: 768px) {
+  .dashboard {
+    flex-direction: column;
+  }
+
+  .mobile-top-bar {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 8px 0 32px rgba(15, 23, 42, 0.15);
+    background: #FFFFFF;
+    padding: 1.5rem 1.25rem;
+    z-index: 999;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-left: auto;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sidebar-close-btn:hover {
+    color: var(--text-primary);
+    background: rgba(15, 23, 42, 0.04);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+  }
+
+  .main-content {
+    padding: 1.5rem 1.25rem;
+    gap: 2rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .create-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .stat-card {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .meetings-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}

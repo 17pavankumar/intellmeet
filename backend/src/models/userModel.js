@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['Member', 'Admin'], // Only 'Member' or 'Admin' values are valid roles
     default: 'Member' // Default user role is 'Member'
+  },
+  googleId: {
+    type: String,
+    sparse: true, // Allows multiple null values for users registered with email/password
+    unique: true // Google ID must be unique
   }
 }, {
   // Automatically add createdAt and updatedAt date fields to each document

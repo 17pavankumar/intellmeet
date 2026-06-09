@@ -17,6 +17,7 @@ interface AuthState {
   error: string | null; // Holds error message strings if authentication fails
   login: (email: string, password: string) => Promise<void>; // Action: Login request
   register: (name: string, email: string, password: string) => Promise<void>; // Action: Registration request
+  loginWithGoogle: (idToken: string) => Promise<void>; // Action: Google login request
   logout: () => void; // Action: Clear session credentials
 }
 
@@ -77,6 +78,33 @@ const useAuthStore = create<AuthState>((set) => ({
       // Retrieve error message or show default fallback
       set({ 
         error: err.response?.data?.message || 'Registration failed. Please make sure the backend is running.', 
+        isLoading: false 
+      });
+    }
+  },
+
+  // Action to log in a user via Google ID Token
+  loginWithGoogle: async (idToken) => {
+    // Clear previous error and set loading state to true
+    set({ isLoading: true, error: null });
+    try {
+      // Send a POST request to register/login via Google
+      const { data } = await API.post('/auth/google', { idToken });
+      
+      // Destructure authentication credentials and user profile details
+      const { token, ...user } = data;
+      
+      // Save credentials into browser storage
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Update global state variables
+      set({ user, token, isLoading: false });
+    } catch (err: any) {
+      console.error('Google login error:', err);
+      // Retrieve error message or show default fallback
+      set({ 
+        error: err.response?.data?.message || 'Google Sign-in failed. Please make sure the backend is running.', 
         isLoading: false 
       });
     }

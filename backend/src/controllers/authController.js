@@ -1,6 +1,10 @@
 // Import jsonwebtoken (JWT) library to sign/create secure authentication tokens
 const jwt = require('jsonwebtoken');
 
+// Import Google OAuth2Client for token validation
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 // Import the User model to query and modify user accounts in MongoDB
 const User = require('../models/userModel');
 
@@ -102,5 +106,76 @@ const getMe = async (req, res) => {
   return res.json(req.user);
 };
 
+/**
+ * @route   POST /api/auth/google
+ * @desc    Authenticate user via Google ID Token
+ * @access  Public
+ */
+const googleLogin = async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({ message: 'Google ID Token is required' });
+  }
+
+  try {
+    // Verify the Google ID Token
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(400).json({ message: 'Invalid Google token payload' });
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Check if the user already exists by googleId
+    let user = await User.findOne({ googleId });
+
+    if (!user) {
+      // Check if the user already exists by email (to link accounts)
+      user = await User.findOne({ email });
+
+      if (user) {
+        // Link the Google account to the existing email account
+        user.googleId = googleId;
+        if (!user.avatar && picture) {
+          user.avatar = picture;
+        }
+        await user.save();
+      } else {
+        // Register a new user with Google details
+        // Generate a secure random password since Google users don't use passwords
+        const randomPassword = require('crypto').randomBytes(16).toString('hex');
+        user = await User.create({
+          name,
+          email,
+          password: randomPassword,
+          googleId,
+          avatar: picture || ''
+        });
+      }
+    }
+
+    // Generate JWT access token for the authenticated user
+    const token = generateToken(user._id);
+
+    return res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      token: token
+    });
+  } catch (error) {
+    console.error('Google Auth Error:', error);
+    return res.status(400).json({ message: 'Google authentication failed: ' + error.message });
+  }
+};
+
 // Export controller functions for auth routes mapping
-module.exports = { register, login, getMe };
+module.exports = { register, login, getMe, googleLogin };

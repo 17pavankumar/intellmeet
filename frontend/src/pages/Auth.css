@@ -283,3 +283,68 @@
   color: var(--text-primary);
   text-decoration: underline;
 }
+
+/* ── Google Authentication ────────────────────────── */
+.google-auth-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 1.5rem;
+  width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.25rem;
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.auth-divider span {
+  padding: 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.google-btn {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Mobile Responsiveness ────────────────────────── */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 2.25rem 1.5rem;
+    border-radius: var(--radius-lg);
+  }
+
+  .auth-title {
+    font-size: 1.6rem;
+  }
+
+  .auth-subtitle {
+    font-size: 0.88rem;
+  }
+
+  .form-group input {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .auth-btn {
+    padding: 0.8rem;
+    font-size: 0.9rem;
+  }
+}

@@ -7,6 +7,7 @@ import CreateMeetingModal from '../components/CreateMeetingModal.tsx';
 import TasksBoard from '../components/TasksBoard.tsx';
 import CreateTaskModal from '../components/CreateTaskModal.tsx';
 import Analytics from '../components/Analytics.tsx';
+import { Menu, X } from 'lucide-react';
 import './Dashboard.css';
 
 /**
@@ -26,15 +27,45 @@ const DashboardPage: React.FC = () => {
 
   // Sidebar navigation tab selector state (dashboard, meetings, tasks, analytics)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'meetings' | 'tasks' | 'analytics'>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="dashboard">
+      {/* Mobile Top Header */}
+      <div className="mobile-top-bar">
+        <button 
+          className="hamburger-btn" 
+          onClick={() => setIsSidebarOpen(true)}
+          aria-label="Open navigation menu"
+        >
+          <Menu size={24} />
+        </button>
+        <div className="mobile-bar-brand">
+          <div className="mobile-bar-logo">IM</div>
+          <span>IntellMeet</span>
+        </div>
+      </div>
+
+      {/* Backdrop overlay for closing the mobile sidebar */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       
       {/* 1. SIDEBAR PANEL */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="sidebar-logo">IM</div>
           <span>IntellMeet</span>
+          <button 
+            className="sidebar-close-btn" 
+            onClick={() => setIsSidebarOpen(false)}
+            aria-label="Close navigation menu"
+          >
+            <X size={20} />
+          </button>
         </div>
         
         {/* Navigation Links */}
@@ -43,7 +74,7 @@ const DashboardPage: React.FC = () => {
             href="#"
             id="nav-dashboard"
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}
+            onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); setIsSidebarOpen(false); }}
           >
             <span className="nav-icon"></span> Dashboard
           </a>
@@ -51,7 +82,7 @@ const DashboardPage: React.FC = () => {
             href="#"
             id="nav-meetings"
             className={`nav-item ${activeTab === 'meetings' ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('meetings'); }}
+            onClick={(e) => { e.preventDefault(); setActiveTab('meetings'); setIsSidebarOpen(false); }}
           >
             <span className="nav-icon"></span> Meetings
           </a>
@@ -59,7 +90,7 @@ const DashboardPage: React.FC = () => {
             href="#"
             id="nav-tasks"
             className={`nav-item ${activeTab === 'tasks' ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('tasks'); }}
+            onClick={(e) => { e.preventDefault(); setActiveTab('tasks'); setIsSidebarOpen(false); }}
           >
             <span className="nav-icon"></span> Tasks
           </a>
@@ -67,7 +98,7 @@ const DashboardPage: React.FC = () => {
             href="#"
             id="nav-analytics"
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('analytics'); }}
+            onClick={(e) => { e.preventDefault(); setActiveTab('analytics'); setIsSidebarOpen(false); }}
           >
             <span className="nav-icon"></span> Analytics
           </a>

@@ -17,7 +17,7 @@ const AuthPage: React.FC = () => {
   const [password, setPassword] = useState('');
 
   // Extract auth actions and state variables from our global auth store
-  const { login, register, isLoading, error, token } = useAuthStore();
+  const { login, register, loginWithGoogle, isLoading, error, token } = useAuthStore();
   const navigate = useNavigate();
 
   // Redirect to dashboard if the user is already authenticated (token exists)
@@ -26,6 +26,60 @@ const AuthPage: React.FC = () => {
       navigate('/dashboard');
     }
   }, [token, navigate]);
+
+  // Handle Google OAuth response payload
+  const handleGoogleLoginResponse = async (response: any) => {
+    if (response.credential) {
+      await loginWithGoogle(response.credential);
+    }
+  };
+
+  // State to track window width for dynamic button resizing
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Initialize Google Sign-in client flow with dynamic width fitting
+  useEffect(() => {
+    const initializeGoogleSignIn = () => {
+      if ((window as any).google?.accounts?.id) {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+        (window as any).google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleLoginResponse,
+        });
+        
+        const btnElement = document.getElementById("google-signin-btn");
+        if (btnElement) {
+          // Dynamically compute width of the form element so it matches input fields
+          const formElement = document.querySelector(".auth-form");
+          const computeWidth = formElement ? formElement.clientWidth : 360;
+          
+          (window as any).google.accounts.id.renderButton(btnElement, {
+            theme: "outline",
+            size: "large",
+            width: Math.min(Math.max(computeWidth, 200), 400),
+          });
+        }
+      }
+    };
+
+    initializeGoogleSignIn();
+
+    // Check periodically in case Google script takes time to load
+    const interval = setInterval(() => {
+      if ((window as any).google?.accounts?.id) {
+        initializeGoogleSignIn();
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isLogin, windowWidth]);
 
   // Handler for form submit events
   const handleSubmit = async (e: React.FormEvent) => {
@@ -129,6 +183,14 @@ const AuthPage: React.FC = () => {
           </button>
           
         </form>
+
+        {/* Google Authentication divider and button */}
+        <div className="google-auth-container">
+          <div className="auth-divider">
+            <span>or</span>
+          </div>
+          <div id="google-signin-btn" className="google-btn"></div>
+        </div>
       </div>
     </div>
   );
