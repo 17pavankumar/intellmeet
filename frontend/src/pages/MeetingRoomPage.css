@@ -655,6 +655,7 @@
   width: 100%;
   box-sizing: border-box;
   -webkit-appearance: none; /* remove iOS inner shadow */
+  appearance: none;
 }
 
 /* Placeholder visible on dark background */
