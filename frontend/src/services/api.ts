@@ -41,8 +41,17 @@ API.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
+      const currentPath = window.location.pathname;
+      
+      // IMPORTANT: Do NOT redirect guests on meeting pages.
+      // Meeting rooms allow unauthenticated guest access — guests click a shared
+      // link and enter their name in the lobby. Redirecting them to /auth here
+      // would prevent anyone from joining via a shared link without an account.
+      const isMeetingPage = currentPath.startsWith('/meeting/');
+      
       // Only redirect if we're not already on the auth page (prevents redirect loops)
-      if (window.location.pathname !== '/auth') {
+      // and not on a meeting room page (guests are allowed there)
+      if (currentPath !== '/auth' && !isMeetingPage) {
         window.location.href = '/auth';
       }
     }

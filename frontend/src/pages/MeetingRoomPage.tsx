@@ -99,6 +99,10 @@ const MeetingRoomPage: React.FC = () => {
   
   // State: retry attempt counter to re-trigger media access
   const [mediaRetryCount, setMediaRetryCount] = useState(0);
+
+  // State: stores local media stream so React re-renders when it becomes available
+  // (useRef alone won't trigger the video element srcObject binding effect)
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   // State: checks if the local user is presenting their screen
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -198,56 +202,70 @@ const MeetingRoomPage: React.FC = () => {
     let isMounted = true;
 
     const initMeeting = async () => {
-      try {
-        // On mobile browsers, camera/mic requires HTTPS — provide a helpful message
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          if (isMounted) {
-            setMediaError("Camera/microphone not supported. Make sure you are on a secure (HTTPS) connection.");
-          }
-        } else {
-          // Request local user hardware access
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          
-          if (!isMounted) {
-            stream.getTracks().forEach(track => track.stop());
-            return;
-          }
-          
-          // Save the stream locally
-          localStreamRef.current = stream;
-          setMediaError(null); // Clear any previous error
-          
-          // Assign stream directly to video ref if bound
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
-        }
-      } catch (err: any) {
-        console.error("Error accessing media devices.", err);
+      // ── Media acquisition with graceful fallbacks ──────────────────────────
+      // Try: video+audio → audio only → no media (chat only)
+      // This ensures the meeting works even if camera/mic is unavailable.
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         if (isMounted) {
-          // Provide specific messages for different failure modes
-          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            setMediaError("Camera/microphone access was denied. Please allow permissions in your browser settings and tap the retry button below.");
-          } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-            setMediaError("No camera or microphone found on this device. You can still join and chat.");
-          } else if (err.name === 'NotReadableError') {
-            setMediaError("Camera/microphone is being used by another app. Close other video apps and tap retry.");
+          setMediaError("Camera/microphone not supported on this browser. Make sure you are on a secure (HTTPS) connection.");
+        }
+      } else {
+        try {
+          // Attempt 1: full video + audio
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          if (!isMounted) { stream.getTracks().forEach(t => t.stop()); return; }
+          localStreamRef.current = stream;
+          setLocalStream(stream);
+          setMediaError(null);
+        } catch (videoErr: any) {
+          console.warn('Video+audio failed, trying audio only:', videoErr.name);
+          if (videoErr.name === 'NotAllowedError' || videoErr.name === 'PermissionDeniedError') {
+            // User explicitly denied — don't try fallback, just show helpful message
+            if (isMounted) {
+              setMediaError("Camera/microphone access was denied. Open browser settings, allow permissions, then tap Retry.");
+            }
           } else {
-            setMediaError("Could not access camera/microphone. You can still join without video. Tap retry to try again.");
+            // Camera unavailable / in use — try audio only
+            try {
+              const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+              if (!isMounted) { audioStream.getTracks().forEach(t => t.stop()); return; }
+              localStreamRef.current = audioStream;
+              setLocalStream(audioStream);
+              if (isMounted) {
+                setMediaError("Camera unavailable — joining with microphone only.");
+              }
+            } catch (audioErr: any) {
+              console.warn('Audio-only also failed:', audioErr.name);
+              if (isMounted) {
+                if (audioErr.name === 'NotFoundError' || audioErr.name === 'DevicesNotFoundError') {
+                  setMediaError("No camera or microphone found. You can still join and chat.");
+                } else {
+                  setMediaError("Could not access camera/microphone. You can still participate via chat.");
+                }
+              }
+            }
           }
         }
       }
       
       if (!isMounted) return;
       
-      // Select socket host address dynamically
-      let socketHost = 'localhost';
-      if (typeof window !== 'undefined') {
-        if (window.location.hostname === '127.0.0.1') {
-          socketHost = '127.0.0.1';
+      // ── Resolve WebSocket server URL ──────────────────────────────────────
+      // Priority: VITE_SOCKET_URL → derived from VITE_API_URL → localhost fallback
+      // On production (Vercel), VITE_SOCKET_URL or VITE_API_URL must be set in
+      // Vercel environment variables pointing to the Render backend.
+      let socketUrl = import.meta.env.VITE_SOCKET_URL as string | undefined;
+      if (!socketUrl) {
+        const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+        if (apiUrl) {
+          // Strip the /api suffix to get the base server URL for WebSockets
+          socketUrl = apiUrl.replace(/\/api\/?$/, '');
+        } else {
+          // Local development fallback
+          const socketHost = window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
+          socketUrl = 'http://' + socketHost + ':5000';
         }
       }
-      const socketUrl = import.meta.env.VITE_SOCKET_URL || ('http://' + socketHost + ':5000');
       
       // Connect to WebSocket server
       socketRef.current = io(socketUrl);
@@ -507,20 +525,32 @@ const MeetingRoomPage: React.FC = () => {
     };
   }, [id, isReadyToJoin, !!meeting, !!restrictionError, mediaRetryCount]);
 
-  // EFFECT: Keep video srcObject updated when camera streams change
+  // EFFECT: Bind local stream to the video element whenever stream or screen-share state changes.
+  // Using 'localStream' state (not just the ref) ensures React re-runs this effect when the
+  // camera stream becomes available — refs don't trigger re-renders so the srcObject would
+  // otherwise never be set if the video element wasn't mounted yet when getUserMedia resolved.
   useEffect(() => {
     if (localVideoRef.current) {
-      const activeStream = isScreenSharing ? screenStreamRef.current : localStreamRef.current;
+      const activeStream = isScreenSharing ? screenStreamRef.current : localStream;
       if (activeStream && localVideoRef.current.srcObject !== activeStream) {
         localVideoRef.current.srcObject = activeStream;
       }
     }
-  }, [isScreenSharing, isReadyToJoin]);
+  }, [isScreenSharing, isReadyToJoin, localStream]);
 
   // Helper method: builds new RTCPeerConnection object and hooks events
   const createPeerConnection = (socketId: string, isInitiator: boolean) => {
+    // Deduplicate: if a connection to this socket already exists and is not closed, reuse it.
+    // This prevents multiple "Connecting to Pavan..." spinners when the socket reconnects
+    // (e.g. Render cold-start causes a brief disconnect then reconnect with a new socket ID).
     if (peersRef.current[socketId]) {
-      return peersRef.current[socketId];
+      const existing = peersRef.current[socketId];
+      // Only reuse if the connection is still viable
+      if (existing.signalingState !== 'closed') {
+        return existing;
+      }
+      // If closed, remove it so we recreate below
+      delete peersRef.current[socketId];
     }
 
     const pc = new RTCPeerConnection(configuration);
