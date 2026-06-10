@@ -215,6 +215,27 @@
   font-weight: 600;
 }
 
+.auth-warning-banner {
+  background: rgba(245, 158, 11, 0.08); /* Transparent Amber */
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #D97706; /* Amber-600 */
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.825rem;
+  line-height: 1.4;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+.auth-warning-banner svg {
+  flex-shrink: 0;
+}
+
 .auth-btn {
   margin-top: 0.75rem;
   padding: 0.9rem;

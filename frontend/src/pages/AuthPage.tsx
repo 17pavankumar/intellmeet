@@ -20,6 +20,23 @@ const AuthPage: React.FC = () => {
   const { login, register, loginWithGoogle, isLoading, error, token } = useAuthStore();
   const navigate = useNavigate();
 
+  // State to check and display missing production configurations
+  const [envWarning, setEnvWarning] = useState<string | null>(null);
+
+  useEffect(() => {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost) {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const googleId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      
+      if (!apiUrl) {
+        setEnvWarning('VITE_API_URL is missing in Vercel. Frontend cannot contact Render backend.');
+      } else if (!googleId) {
+        setEnvWarning('VITE_GOOGLE_CLIENT_ID is missing in Vercel. Google auth is disabled.');
+      }
+    }
+  }, []);
+
   // Redirect to dashboard if the user is already authenticated (token exists)
   useEffect(() => {
     if (token) {
@@ -116,6 +133,14 @@ const AuthPage: React.FC = () => {
           <h1 className="auth-title">IntellMeet</h1>
           <p className="auth-subtitle">AI-Powered Meeting Intelligence</p>
         </div>
+
+        {/* Dynamic environment setup warning for developer deployments */}
+        {envWarning && (
+          <div className="auth-warning-banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>{envWarning}</span>
+          </div>
+        )}
 
         {/* Tab switchers to toggle between Sign In / Sign Up */}
         <div className="auth-tabs">
