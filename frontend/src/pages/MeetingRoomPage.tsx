@@ -97,6 +97,9 @@ const MeetingRoomPage: React.FC = () => {
   // State: error description when hardware devices can't be fetched
   const [mediaError, setMediaError] = useState<string | null>(null);
   
+  // State: retry attempt counter to re-trigger media access
+  const [mediaRetryCount, setMediaRetryCount] = useState(0);
+  
   // State: checks if the local user is presenting their screen
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   
@@ -142,6 +145,7 @@ const MeetingRoomPage: React.FC = () => {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const peersRef = useRef<Record<string, RTCPeerConnection>>({});
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   // STUN servers configuration for network discovery
   const configuration = {
@@ -181,6 +185,13 @@ const MeetingRoomPage: React.FC = () => {
     };
   }, [id]);
 
+  // EFFECT: Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   // EFFECT: Access local media stream and initialize websocket connection
   useEffect(() => {
     if (!isReadyToJoin || !meeting || restrictionError) return;
@@ -188,25 +199,42 @@ const MeetingRoomPage: React.FC = () => {
 
     const initMeeting = async () => {
       try {
-        // Request local user hardware access
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        
-        if (!isMounted) {
-          stream.getTracks().forEach(track => track.stop());
-          return;
-        }
-        
-        // Save the stream locally
-        localStreamRef.current = stream;
-        
-        // Assign stream directly to video ref if bound
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+        // On mobile browsers, camera/mic requires HTTPS — provide a helpful message
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          if (isMounted) {
+            setMediaError("Camera/microphone not supported. Make sure you are on a secure (HTTPS) connection.");
+          }
+        } else {
+          // Request local user hardware access
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          
+          if (!isMounted) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+          }
+          
+          // Save the stream locally
+          localStreamRef.current = stream;
+          setMediaError(null); // Clear any previous error
+          
+          // Assign stream directly to video ref if bound
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
         }
       } catch (err: any) {
         console.error("Error accessing media devices.", err);
         if (isMounted) {
-          setMediaError("Could not access camera/microphone. You can still join without video.");
+          // Provide specific messages for different failure modes
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            setMediaError("Camera/microphone access was denied. Please allow permissions in your browser settings and tap the retry button below.");
+          } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            setMediaError("No camera or microphone found on this device. You can still join and chat.");
+          } else if (err.name === 'NotReadableError') {
+            setMediaError("Camera/microphone is being used by another app. Close other video apps and tap retry.");
+          } else {
+            setMediaError("Could not access camera/microphone. You can still join without video. Tap retry to try again.");
+          }
         }
       }
       
@@ -477,7 +505,7 @@ const MeetingRoomPage: React.FC = () => {
         socketRef.current = null;
       }
     };
-  }, [id, isReadyToJoin, !!meeting, !!restrictionError]);
+  }, [id, isReadyToJoin, !!meeting, !!restrictionError, mediaRetryCount]);
 
   // EFFECT: Keep video srcObject updated when camera streams change
   useEffect(() => {
@@ -1055,7 +1083,20 @@ const MeetingRoomPage: React.FC = () => {
         
         {/* 3.2.1: Video Streams layout grid */}
         <div className="video-area">
-          {mediaError ? <div className="media-error-alert">{mediaError}</div> : null}
+          {mediaError ? (
+            <div className="media-error-alert">
+              <span>{mediaError}</span>
+              <button
+                className="media-retry-btn"
+                onClick={() => {
+                  setMediaError(null);
+                  setMediaRetryCount(c => c + 1);
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
           
           <div className="videos-grid">
             {/* Local Speaker Video Card */}
@@ -1172,6 +1213,9 @@ const MeetingRoomPage: React.FC = () => {
                   })}
                   
                   {/* Empty chat placeholder container */}
+                  {/* Invisible scroll anchor at the bottom of the message list */}
+                  <div ref={chatBottomRef} />
+
                   {messages.length === 0 ? (
                     <div className="empty-chat-container">
                       <div className="empty-chat-icon-wrap">
