@@ -246,6 +246,8 @@
 .media-error-alert span {
   flex: 1;
   min-width: 0;
+  white-space: pre-line; /* render \n newlines in step-by-step permission guide */
+  line-height: 1.6;
 }
 
 .media-retry-btn {

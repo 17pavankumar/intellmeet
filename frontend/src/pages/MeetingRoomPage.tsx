@@ -218,30 +218,33 @@ const MeetingRoomPage: React.FC = () => {
           setLocalStream(stream);
           setMediaError(null);
         } catch (videoErr: any) {
-          console.warn('Video+audio failed, trying audio only:', videoErr.name);
-          if (videoErr.name === 'NotAllowedError' || videoErr.name === 'PermissionDeniedError') {
-            // User explicitly denied — don't try fallback, just show helpful message
+          console.warn('Video+audio failed:', videoErr.name);
+
+          // Always try audio-only next — even on NotAllowedError.
+          // Mobile Chrome sometimes only blocks the camera permission but still
+          // allows microphone, so a separate audio-only request can succeed.
+          try {
+            const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            if (!isMounted) { audioStream.getTracks().forEach(t => t.stop()); return; }
+            localStreamRef.current = audioStream;
+            setLocalStream(audioStream);
             if (isMounted) {
-              setMediaError("Camera/microphone access was denied. Open browser settings, allow permissions, then tap Retry.");
-            }
-          } else {
-            // Camera unavailable / in use — try audio only
-            try {
-              const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-              if (!isMounted) { audioStream.getTracks().forEach(t => t.stop()); return; }
-              localStreamRef.current = audioStream;
-              setLocalStream(audioStream);
-              if (isMounted) {
-                setMediaError("Camera unavailable — joining with microphone only.");
+              if (videoErr.name === 'NotAllowedError' || videoErr.name === 'PermissionDeniedError') {
+                setMediaError("📷 Camera was blocked — joined with microphone only. Tap the 🔒 lock in the address bar → Site settings → Allow Camera, then tap Retry.");
+              } else {
+                setMediaError("Camera unavailable — joined with microphone only.");
               }
-            } catch (audioErr: any) {
-              console.warn('Audio-only also failed:', audioErr.name);
-              if (isMounted) {
-                if (audioErr.name === 'NotFoundError' || audioErr.name === 'DevicesNotFoundError') {
-                  setMediaError("No camera or microphone found. You can still join and chat.");
-                } else {
-                  setMediaError("Could not access camera/microphone. You can still participate via chat.");
-                }
+            }
+          } catch (audioErr: any) {
+            console.warn('Audio-only also failed:', audioErr.name);
+            if (isMounted) {
+              if (videoErr.name === 'NotAllowedError' || videoErr.name === 'PermissionDeniedError') {
+                // Both camera and mic were blocked — give clear mobile step-by-step guide
+                setMediaError("🎤 Camera & microphone blocked. To fix:\n1. Tap the 🔒 lock icon in your browser address bar\n2. Tap Site settings or Permissions\n3. Set Camera and Microphone to Allow\n4. Tap the Retry button");
+              } else if (audioErr.name === 'NotFoundError' || audioErr.name === 'DevicesNotFoundError') {
+                setMediaError("No camera or microphone found on this device. You can still join and use chat.");
+              } else {
+                setMediaError("Could not access camera/microphone. You can still see and hear others.");
               }
             }
           }
@@ -578,12 +581,27 @@ const MeetingRoomPage: React.FC = () => {
       }
     };
 
-    // Attach local camera/mic tracks to feed the connection
+    // Attach local camera/mic tracks to feed the connection.
+    // IMPORTANT: If no local stream is available (camera/mic denied or unavailable),
+    // we MUST still add recvonly transceivers. Without transceivers the SDP offer/answer
+    // has zero media sections and WebRTC negotiation silently fails — meaning the local
+    // user cannot hear or see the remote participant even though they have their camera on.
     if (localStreamRef.current) {
+      // We have local media — add tracks normally (sendrecv by default)
       const tracks = localStreamRef.current.getTracks();
       for (let i = 0; i < tracks.length; i++) {
-        const track = tracks[i];
-        pc.addTrack(track, localStreamRef.current);
+        pc.addTrack(tracks[i], localStreamRef.current);
+      }
+    } else {
+      // No local media — add receive-only transceivers so we can still RECEIVE
+      // the remote participant's audio and video stream.
+      try {
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+        pc.addTransceiver('video', { direction: 'recvonly' });
+      } catch (transceiverErr) {
+        // Older browsers (e.g. Safari 12) don't support addTransceiver.
+        // In that case the SDP negotiation may still work partially via offer/answer.
+        console.warn('addTransceiver not supported on this browser:', transceiverErr);
       }
     }
 
