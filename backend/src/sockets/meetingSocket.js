@@ -110,9 +110,21 @@ const setupMeetingSocket = (io) => {
       });
     });
 
-    // Listener: A client disconnects completely (e.g. closes browser window)
+    // Listener: A client disconnects completely (e.g. closes browser tab or network drops)
     socket.on('disconnect', () => {
       console.log('User disconnected: ' + socket.id);
+
+      // Notify ALL meeting rooms this socket was in that the participant left.
+      // socket.rooms is a Set that always contains the socket's own ID room plus
+      // any rooms joined via socket.join(). We skip the self-room (socket.id).
+      // Without this, disconnected participants stay in peers' participant lists
+      // forever — so when they reconnect with a new socket ID, two entries appear.
+      socket.rooms.forEach((roomId) => {
+        if (roomId !== socket.id) {
+          socket.to(roomId).emit('user-left', { socketId: socket.id });
+          console.log('Emitted user-left for ' + socket.id + ' in room ' + roomId);
+        }
+      });
     });
 
     // ----- WebRTC Peer-to-Peer Signaling Events -----

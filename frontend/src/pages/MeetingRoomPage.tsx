@@ -151,12 +151,37 @@ const MeetingRoomPage: React.FC = () => {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  // STUN servers configuration for network discovery
+  // ICE server configuration: STUN + TURN servers for NAT traversal.
+  // STUN servers help peers discover their public IP/port (works for simple NAT).
+  // TURN servers RELAY media traffic when direct peer-to-peer paths fail — this is
+  // required on mobile 5G/LTE networks which use symmetric NAT (STUN alone fails).
+  // Using free Open Relay Project TURN servers for production connectivity.
   const configuration = {
     iceServers: [
+      // Google STUN — fast direct connection when possible
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+      { urls: 'stun:stun1.l.google.com:19302' },
+      // Open Relay free TURN — port 80 (bypasses most firewalls)
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      // Open Relay free TURN — port 443 (HTTPS port, almost never blocked)
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      // Open Relay free TURN over TCP — fallback when UDP is blocked
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    ],
+    // Prioritise relay candidates so mobile connections succeed faster
+    iceCandidatePoolSize: 10
   };
 
   // EFFECT: Fetch meeting configuration and check credentials on load

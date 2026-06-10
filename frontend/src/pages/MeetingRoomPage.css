@@ -397,14 +397,21 @@
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  /* Fill available height minus top/bottom margin */
-  height: calc(100vh - 2rem);
-  margin: 1rem 1rem 1rem 0;
+  /* Subtract top/bottom margin AND the controls bar (80px) so drawer never hides the input */
+  height: calc(100vh - 2rem - 80px);
+  margin: 1rem 1rem 0 0;
   border-radius: 16px;
   box-shadow: -5px 0 25px rgba(0, 0, 0, 0.4);
   z-index: 50;
   overflow: hidden;
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s ease;
+}
+
+/* Use dynamic viewport height on modern browsers (accounts for mobile address bar) */
+@supports (height: 100dvh) {
+  .meet-sidebar-drawer {
+    height: calc(100dvh - 2rem - 80px);
+  }
 }
 
 .drawer-header {
@@ -635,19 +642,30 @@
 
 .meet-chat-input-form input {
   flex: 1;
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.07);
+  /* Stronger border so the input field is clearly visible */
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
   padding: 0.75rem 1.25rem;
   border-radius: 24px;
-  color: white;
+  color: #ffffff;
   font-size: 0.88rem;
+  font-family: inherit;
   outline: none;
   transition: all 0.25s ease;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none; /* remove iOS inner shadow */
+}
+
+/* Placeholder visible on dark background */
+.meet-chat-input-form input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .meet-chat-input-form input:focus {
   border-color: var(--meet-btn-primary);
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.15);
 }
 
 .send-msg-btn {
@@ -1422,16 +1440,33 @@
 
   /* Ensure chat input is always visible even with soft keyboard open */
   .drawer-chat-container {
+    display: flex;
+    flex-direction: column;
     height: 100%;
+    overflow: hidden;
   }
 
+  /* Message list scrolls, input stays pinned */
   .drawer-chat-messages {
+    flex: 1;
+    min-height: 0;
     padding: 1rem;
+    overflow-y: auto;
   }
 
+  /* Input form always visible at bottom */
   .meet-chat-input-form {
-    padding: 0.6rem 0.75rem;
-    padding-bottom: max(0.6rem, env(safe-area-inset-bottom));
+    flex-shrink: 0;
+    padding: 0.65rem 0.85rem;
+    padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+    background-color: rgba(32, 33, 36, 0.98);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Larger tap target on mobile */
+  .meet-chat-input-form input {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom on focus */
   }
 
   .meeting-header {
