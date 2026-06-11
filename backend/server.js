@@ -12,6 +12,8 @@ const cors = require('cors');
 
 // Import dotenv library to load configuration variables from the .env file into process.env
 const dotenv = require('dotenv');
+// Load environment variables from the .env configuration file into process.env
+dotenv.config();
 
 // Import mongoose library to connect to and interact with our MongoDB database
 const mongoose = require('mongoose');
@@ -23,9 +25,6 @@ const taskRoutes = require('./src/routes/taskRoutes');
 
 // Import socket setup function to initialize WebSockets event listeners for meeting features
 const setupMeetingSocket = require('./src/sockets/meetingSocket');
-
-// Load environment variables from the .env configuration file into process.env
-dotenv.config();
 
 // Create an instance of the Express application
 const app = express();

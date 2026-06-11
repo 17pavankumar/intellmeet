@@ -3,7 +3,13 @@ const jwt = require('jsonwebtoken');
 
 // Import Google OAuth2Client for token validation
 const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+
+if (!googleClientId) {
+  console.warn('⚠️ WARNING: GOOGLE_CLIENT_ID is not defined in the environment variables. Google OAuth will fail in production.');
+}
+
+const client = new OAuth2Client(googleClientId);
 
 // Import the User model to query and modify user accounts in MongoDB
 const User = require('../models/userModel');
