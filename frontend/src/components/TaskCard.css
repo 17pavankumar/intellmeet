@@ -112,3 +112,27 @@
   border-color: var(--danger);
   box-shadow: 0 4px 10px rgba(220, 38, 38, 0.15);
 }
+
+/* Assignee styling */
+.task-assignee {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.03);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.assignee-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.assignee-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}

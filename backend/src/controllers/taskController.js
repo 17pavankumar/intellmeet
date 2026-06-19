@@ -1,5 +1,7 @@
 // Import the Task model to query, create, update and delete task documents in MongoDB
 const Task = require('../models/taskModel');
+// Import the Team model to handle collaborative workspace task filtering
+const Team = require('../models/teamModel');
 
 /**
  * @route   POST /api/tasks
@@ -39,10 +41,39 @@ const createTask = async (req, res) => {
  */
 const getMyTasks = async (req, res) => {
   try {
-    // Query database for tasks where assignedTo field matches the user's ID
-    const tasks = await Task.find({ assignedTo: req.user._id })
-      // Populate fields: replace User IDs with names and emails, and include meeting titles
-      .populate('createdBy', 'name email')
+    // Find all team workspaces where the authenticated user is either the owner or a member
+    const userTeams = await Team.find({
+      $or: [
+        { owner: req.user._id },
+        { members: req.user._id }
+      ]
+    });
+
+    // Accumulate all member IDs from these workspaces to retrieve shared/shared-assigned tasks
+    const workspaceUserIds = new Set();
+    workspaceUserIds.add(req.user._id.toString()); // Always include current user
+
+    userTeams.forEach((team) => {
+      if (team.owner) {
+        workspaceUserIds.add(team.owner.toString());
+      }
+      if (team.members && team.members.length > 0) {
+        team.members.forEach((memberId) => {
+          workspaceUserIds.add(memberId.toString());
+        });
+      }
+    });
+
+    // Query database for tasks that are either assigned to or created by any member of the workspaces
+    const tasks = await Task.find({
+      $or: [
+        { assignedTo: { $in: Array.from(workspaceUserIds) } },
+        { createdBy: { $in: Array.from(workspaceUserIds) } }
+      ]
+    })
+      // Populate fields: replace User IDs with details, and include meeting titles
+      .populate('assignedTo', 'name email avatar role')
+      .populate('createdBy', 'name email avatar role')
       .populate('meeting', 'title')
       // Sort tasks: display newly created tasks first
       .sort({ createdAt: -1 });

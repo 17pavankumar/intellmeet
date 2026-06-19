@@ -8,6 +8,17 @@ interface Task {
   title: string;
   description: string;
   status: 'todo' | 'in-progress' | 'done';
+  assignedTo?: {
+    _id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  createdBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
 }
 
 // Props expected by TaskCard
@@ -43,6 +54,14 @@ const TaskCard: React.FC<Props> = ({ task }) => {
       
       {/* Task description */}
       <p className="task-desc">{task.description || 'No description'}</p>
+
+      {/* Task assignee details */}
+      {task.assignedTo && typeof task.assignedTo === 'object' && (
+        <div className="task-assignee">
+          <span className="assignee-label">Assignee:</span>
+          <span className="assignee-name">{task.assignedTo.name}</span>
+        </div>
+      )}
       
       {/* Action panel containing dropdown selector and delete button */}
       <div className="task-actions">

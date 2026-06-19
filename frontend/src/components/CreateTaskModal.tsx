@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCreateTask } from '../hooks/useTasks';
+import { useTeam } from '../hooks/useTeam';
 import './CreateMeetingModal.css';
 
 // Props expected by the modal component
@@ -15,9 +16,14 @@ const CreateTaskModal: React.FC<Props> = ({ onClose }) => {
   // Local state hook variables to store user task form inputs
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
 
   // Retrieve the task creation action using React Query hook
   const createTaskMutation = useCreateTask();
+
+  // Retrieve team workspace members using the useTeam hook
+  const { data: team } = useTeam();
+  const members = team?.members || [];
 
   // Handler for form submit events
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,8 +32,19 @@ const CreateTaskModal: React.FC<Props> = ({ onClose }) => {
     // Validate that the task title contains non-whitespace text
     if (!title.trim()) return;
     
+    // Create task payload
+    const payload: { title: string; description: string; status: string; assignedTo?: string } = {
+      title,
+      description,
+      status: 'todo'
+    };
+
+    if (assignedTo) {
+      payload.assignedTo = assignedTo;
+    }
+    
     // Call mutation to create task inside database with default state 'todo'
-    await createTaskMutation.mutateAsync({ title, description, status: 'todo' });
+    await createTaskMutation.mutateAsync(payload);
     
     // Close modal
     onClose();
@@ -67,8 +84,36 @@ const CreateTaskModal: React.FC<Props> = ({ onClose }) => {
               value={description} 
               onChange={(e) => setDescription(e.target.value)} 
               placeholder="Add details..."
-              rows={4}
+              rows={3}
             />
+          </div>
+
+          {/* Assign To Dropdown (populated with team members) */}
+          <div className="form-group">
+            <label>Assign To</label>
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="modal-select"
+              style={{
+                width: '100%',
+                padding: '0.85rem 1.25rem',
+                border: '1px solid rgba(15, 23, 42, 0.12)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#FFFFFF',
+                fontFamily: 'inherit',
+                fontSize: '0.95rem',
+                color: 'var(--text-primary)',
+                outline: 'none'
+              }}
+            >
+              <option value="">Myself</option>
+              {members.map((member) => (
+                <option key={member._id} value={member._id}>
+                  {member.name} ({member.email})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="modal-footer">

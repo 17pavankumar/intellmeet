@@ -22,7 +22,7 @@ export const useTasks = () => {
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { title: string; description: string; status: string }) => {
+    mutationFn: async (payload: { title: string; description: string; status: string; assignedTo?: string }) => {
       const { data } = await API.post('/tasks', payload);
       return data;
     },

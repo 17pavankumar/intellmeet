@@ -22,6 +22,7 @@ const mongoose = require('mongoose');
 const authRoutes = require('./src/routes/authRoutes');
 const meetingRoutes = require('./src/routes/meetingRoutes');
 const taskRoutes = require('./src/routes/taskRoutes');
+const teamRoutes = require('./src/routes/teamRoutes');
 
 // Import socket setup function to initialize WebSockets event listeners for meeting features
 const setupMeetingSocket = require('./src/sockets/meetingSocket');
@@ -84,6 +85,9 @@ app.use('/api/meetings', meetingRoutes);
 
 // Mount tasks router endpoints at /api/tasks
 app.use('/api/tasks', taskRoutes);
+
+// Mount teams router endpoints at /api/teams
+app.use('/api/teams', teamRoutes);
 
 // ----- Socket.io Real-Time Signaling Initialization -----
 
