@@ -4,8 +4,8 @@ import { io, Socket } from 'socket.io-client';
 import useAuthStore from '../store/authStore';
 import API from '../services/api';
 import {
-  Mic, MicOff, Video, VideoOff, Monitor, MessageSquare, Users, PhoneOff,
-  Lock, X, Send, Shield, Copy, Check, MoreVertical
+  Mic, MicOff, Video, VideoOff, Monitor, MessageSquare, PhoneOff,
+  Lock, X, Send, Shield, Plus, Volume2, Home
 } from 'lucide-react';
 import './MeetingRoomPage.css';
 
@@ -119,8 +119,8 @@ const MeetingRoomPage: React.FC = () => {
   // State: lists name text for each socket participant
   const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
   
-  // State: sidebar display selector (chat log vs participant roster drawer)
-  const [activeSidebar, setActiveSidebar] = useState<'chat' | 'participants' | null>(null);
+  // State: sidebar display selector (chat log vs access settings drawer)
+  const [activeSidebar, setActiveSidebar] = useState<'chat' | 'settings' | null>(null);
   
   // State: confirms if sharing info has been copied to clipboard
   const [copied, setCopied] = useState(false);
@@ -134,8 +134,6 @@ const MeetingRoomPage: React.FC = () => {
   // State: block page if access is restricted
   const [restrictionError, setRestrictionError] = useState<string | null>(null);
   
-  // State: opens 3-dots share config dropdown
-  const [showShareModal, setShowShareModal] = useState(false);
   
   // State: text to type guest invite email
   const [newInviteEmail, setNewInviteEmail] = useState('');
@@ -933,14 +931,6 @@ const MeetingRoomPage: React.FC = () => {
     return getInitials(name || 'Participant');
   };
 
-  // Compute layout grid styles class depending on total speakers
-  const videoCount = 1 + participants.length;
-  let cardClass = '';
-  if (videoCount === 1) {
-    cardClass = 'single';
-  } else if (videoCount > 4) {
-    cardClass = 'tiled';
-  }
 
   // Lobby form submit check
   const handleLobbySubmit = (e: React.FormEvent) => {
@@ -1012,155 +1002,160 @@ const MeetingRoomPage: React.FC = () => {
     );
   }
 
-  // VIEW 3: Main video call conference room layout
-  return (
-    <div className="meeting-room-container">
-      
-      {/* 3.1: HEADER PANEL */}
-      <header className="meeting-header">
-        <div className="header-left">
-          <h2>Meeting Room: {meeting?.title || id}</h2>
+  // VIEW 3: Main video call conference room layout (Redesigned)
+  
+  // Assemble all video card structures (including local user and remote participants)
+  const allVideoCards = [
+    {
+      id: 'local',
+      name: `${user?.name || guestName} (You)`,
+      isMicMuted: isMicMuted,
+      element: isVideoMuted ? (
+        <div className="redesign-avatar-placeholder">
+          <div className="redesign-avatar-circle">{getLocalInitials()}</div>
         </div>
-        <div className="header-right">
-          {/* Copy Meeting Link button */}
-          <button 
-            className={'copy-link-btn ' + (copied ? 'copied' : '')} 
-            onClick={copyMeetingLink}
-            title="Copy meeting link to share"
-          >
-            {copied ? (
-              <Check size={16} style={{ marginRight: '6px' }} />
-            ) : (
-              <Copy size={16} style={{ marginRight: '6px' }} />
-            )}
-            {copied ? 'Copied!' : 'Copy Info'}
-          </button>
+      ) : (
+        <video 
+          ref={localVideoRef}
+          autoPlay 
+          muted 
+          playsInline 
+          className="meet-video-stream"
+        />
+      )
+    },
+    ...participants.map(pId => {
+      const isRemoteVideoMuted = !!remoteMuteStates[pId]?.video;
+      const isRemoteMicMuted = !!remoteMuteStates[pId]?.audio;
+      const remoteName = participantNames[pId] || (`Guest (${pId.substring(0, 4)})`);
+      return {
+        id: pId,
+        name: remoteName,
+        isMicMuted: isRemoteMicMuted,
+        element: isRemoteVideoMuted ? (
+          <div className="redesign-avatar-placeholder">
+            <div className="redesign-avatar-circle">{getParticipantInitials(pId)}</div>
+          </div>
+        ) : (
+          remoteStreams[pId] ? (
+            <RemoteVideo stream={remoteStreams[pId]} />
+          ) : (
+            <div className="redesign-video-connecting">
+              <div className="redesign-spinner"></div>
+              <span>Connecting to {remoteName}...</span>
+            </div>
+          )
+        )
+      };
+    })
+  ];
 
-          {/* Settings Menu popover button wrapper */}
-          <div className="share-settings-wrapper">
-            <button
-              className={'settings-dots-btn ' + (showShareModal ? 'active' : '')}
-              onClick={() => setShowShareModal(!showShareModal)}
-              title="Meeting Share Settings"
-            >
-              <MoreVertical size={20} />
-            </button>
-
-            {/* Privacy setting dropdown config */}
-            {showShareModal && meeting ? (
-              <div className="share-settings-popover">
-                <div className="popover-header">
-                  <h4>Access Restrictions</h4>
-                  <button className="popover-close-btn" onClick={() => setShowShareModal(false)}>
-                    <X size={16} />
-                  </button>
-                </div>
-                
-                {/* Access Options Toggle Pills */}
-                <div className="access-options">
-                  <button 
-                    className={'access-pill ' + (meeting.accessType === 'public' ? 'active' : '')}
-                    onClick={() => handleToggleAccessType('public')}
-                    disabled={isSavingAccess || meeting.host?._id !== user?._id}
-                  >
-                    <span className="dot public-dot"></span>
-                    Anyone with link (Public)
-                  </button>
-                  <button 
-                    className={'access-pill ' + (meeting.accessType === 'restricted' ? 'active' : '')}
-                    onClick={() => handleToggleAccessType('restricted')}
-                    disabled={isSavingAccess || meeting.host?._id !== user?._id}
-                  >
-                    <span className="dot restricted-dot"></span>
-                    Only invited guests (Restricted)
-                  </button>
-                </div>
-
-                {/* Share Link Row */}
-                <div className="popover-share-link">
-                  <h5>Meeting Link</h5>
-                  <div className="popover-share-row">
-                    <input 
-                      type="text" 
-                      readOnly 
-                      value={window.location.origin + '/meeting/' + id} 
-                      onClick={(e) => (e.target as HTMLInputElement).select()}
-                      title="Click to select all"
-                    />
-                    <button type="button" onClick={copyMeetingLink}>
-                      {copied ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Invited guest emails registry */}
-                <div className="invited-guests-section">
-                  <h5>Invited Guest List</h5>
-                  
-                  {meeting.host?._id === user?._id ? (
-                    <form onSubmit={handleAddInviteEmail} className="invite-email-form">
-                      <input
-                        type="email"
-                        value={newInviteEmail}
-                        onChange={e => setNewInviteEmail(e.target.value)}
-                        placeholder="Add guest email..."
-                        disabled={isSavingAccess}
-                      />
-                      <button type="submit" disabled={isSavingAccess || !newInviteEmail.trim()}>
-                        Add
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="viewer-notice">Only the host can modify the guest list.</p>
-                  )}
-
-                  {/* List of guest email chips */}
-                  <div className="invited-emails-list">
-                    {meeting.invitedEmails && meeting.invitedEmails.length > 0 ? (
-                      meeting.invitedEmails.map((email: string) => (
-                        <div key={email} className="email-chip">
-                          <span className="email-text" title={email}>{email}</span>
-                          {meeting.host?._id === user?._id ? (
-                            <button 
-                              type="button" 
-                              className="remove-email-btn"
-                              onClick={() => handleRemoveInviteEmail(email)}
-                              disabled={isSavingAccess}
-                              title={'Remove ' + email}
-                            >
-                              <X size={12} />
-                            </button>
-                          ) : null}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="no-emails-placeholder">No guest invitations sent yet.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Network save layout overlay */}
-                {isSavingAccess ? (
-                  <div className="popover-loading-overlay">
-                    <div className="popover-spinner"></div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+  return (
+    <div className="meet-redesign-container">
+      
+      {/* 1. LEFT SIDEBAR PANEL (White/Light) */}
+      <aside className="meet-redesign-sidebar">
+        
+        {/* User profile section */}
+        <div className="sidebar-profile">
+          <div className="profile-avatar">
+            {getLocalInitials()}
+          </div>
+          <div className="profile-details">
+            <span className="profile-name">{user?.name || guestName}</span>
+            <span className="profile-status">
+              <span className="status-dot green"></span> Available
+            </span>
           </div>
         </div>
-      </header>
 
-      {/* 3.2: MEETING STREAMS CONTENT AREA */}
-      <div className="meeting-content">
+        {/* Navigation items */}
+        <nav className="sidebar-navigation">
+          <button className="nav-button active" onClick={() => navigate('/dashboard')}>
+            <span className="nav-icon-wrap"><Home size={18} /></span> Home
+          </button>
+          <button className="nav-button" onClick={() => navigate('/dashboard')}>
+            <span className="nav-icon-wrap"><Plus size={18} /></span> New
+          </button>
+        </nav>
+
+        {/* Contacts / Call Participants Section */}
+        <div className="sidebar-contacts-section">
+          <span className="contacts-title">Contacts</span>
+          
+          {/* Active Call Group */}
+          <div className="active-call-group">
+            <div className="group-avatar-row">
+              <span className="group-icon">📞</span>
+            </div>
+            <div className="group-names-wrap">
+              <span className="group-names">
+                {participants.length > 0 
+                  ? [user?.name || guestName, ...participants.map(p => participantNames[p] || 'Guest')].join(', ')
+                  : 'Just You'}
+              </span>
+            </div>
+            <button className="group-hangup-btn" onClick={() => navigate('/dashboard')} title="Leave Call">
+              🛑
+            </button>
+          </div>
+
+          {/* List of other participants / contacts in call */}
+          <div className="contacts-list">
+            {/* Local User */}
+            <div className="contact-item">
+              <div className="contact-avatar">
+                {getLocalInitials()}
+              </div>
+              <span className="contact-name">{user?.name || guestName} (You)</span>
+              <span className="contact-status-dot online"></span>
+            </div>
+
+            {/* Remote Users */}
+            {participants.map(pId => {
+              const name = participantNames[pId] || 'Guest';
+              const initials = getParticipantInitials(pId);
+              return (
+                <div key={pId} className="contact-item">
+                  <div className="contact-avatar">
+                    {initials}
+                  </div>
+                  <span className="contact-name">{name}</span>
+                  <span className="contact-status-dot online"></span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+
+      {/* 2. MAIN CALL PANEL (Dark Blue/Teal) */}
+      <main className="meet-redesign-main">
         
-        {/* 3.2.1: Video Streams layout grid */}
-        <div className="video-area">
-          {mediaError ? (
+        {/* Top Control/Search Bar */}
+        <div className="main-top-bar">
+          <div className="search-bar-mock" onClick={copyMeetingLink}>
+            <span className="search-icon">🔍</span>
+            <input 
+              type="text" 
+              readOnly 
+              value={`Room: ${meeting?.title || id}`} 
+              title="Click to copy meeting link"
+            />
+            <button className="search-copy-btn">
+              {copied ? 'Copied' : 'Copy Link'}
+            </button>
+          </div>
+        </div>
+
+        {/* Video Workspace Area */}
+        <div className="main-video-workspace">
+          
+          {mediaError && (
             <div className="media-error-alert">
               <span>{mediaError}</span>
-              <button
-                className="media-retry-btn"
+              <button 
+                className="media-retry-btn" 
                 onClick={() => {
                   setMediaError(null);
                   setMediaRetryCount(c => c + 1);
@@ -1169,258 +1164,293 @@ const MeetingRoomPage: React.FC = () => {
                 Retry
               </button>
             </div>
-          ) : null}
-          
-          <div className="videos-grid">
-            {/* Local Speaker Video Card */}
-            <div className={'video-card ' + cardClass}>
-              {isVideoMuted ? (
-                <div className="avatar-placeholder">
-                  <div className="avatar-circle">{getLocalInitials()}</div>
-                  <span className="avatar-label">{user?.name || guestName} (You)</span>
-                </div>
-              ) : (
-                <video 
-                  ref={localVideoRef}
-                  autoPlay 
-                  muted 
-                  playsInline 
-                  className="meet-video-stream"
-                />
-              )}
-              
-              <div className="video-card-overlay">
-                <span className="name-tag">{user?.name || guestName} (You)</span>
-                {isMicMuted ? (
-                  <span className="badge-mic-muted">
-                    <MicOff size={14} />
-                  </span>
-                ) : null}
-              </div>
-            </div>
+          )}
 
-            {/* Remote Speakers Video Cards list */}
-            {participants.map(pId => {
-              const isRemoteVideoMuted = !!remoteMuteStates[pId]?.video;
-              const isRemoteMicMuted = !!remoteMuteStates[pId]?.audio;
-              const remoteName = participantNames[pId] || ('Participant (' + pId.substring(0, 4) + ')');
-
-              return (
-                <div key={pId} className={'video-card ' + cardClass}>
-                  {isRemoteVideoMuted ? (
-                    <div className="avatar-placeholder">
-                      <div className="avatar-circle">{getParticipantInitials(pId)}</div>
-                      <span className="avatar-label">{remoteName}</span>
-                    </div>
-                  ) : (
-                    remoteStreams[pId] ? (
-                      <RemoteVideo stream={remoteStreams[pId]} />
-                    ) : (
-                      // Connecting spinner overlay
-                      <div className="video-connecting">
-                        <div className="video-spinner"></div>
-                        <span>Connecting to {remoteName}...</span>
-                      </div>
-                    )
-                  )}
-
-                  <div className="video-card-overlay">
-                    <span className="name-tag">{remoteName}</span>
-                    {isRemoteMicMuted ? (
-                      <span className="badge-mic-muted">
-                        <MicOff size={14} />
-                      </span>
-                    ) : null}
+          {/* Videos Grid with Redesigned layout */}
+          <div className="redesign-videos-layout">
+            
+            {/* Top Row: up to 3 videos */}
+            <div className="video-row top-row">
+              {allVideoCards.slice(0, 3).map((card, idx) => (
+                <div key={idx} className="redesign-video-card">
+                  {card.element}
+                  <div className="redesign-card-name">
+                    {card.name}
+                    {card.isMicMuted ? <span className="mic-muted-badge">🎙️ Off</span> : null}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 3.2.2: Chat / Roster sliding drawer sidebar panel */}
-        {activeSidebar !== null ? (
-          <div className="meet-sidebar-drawer">
-            <div className="drawer-header">
-              <h3>{activeSidebar === 'chat' ? 'In-call Messages' : 'People'}</h3>
-              <button className="close-drawer-btn" onClick={() => setActiveSidebar(null)}>
-                <X size={20} />
-              </button>
+              ))}
             </div>
 
-            {/* 3.2.2.1: Chat view layout */}
-            {activeSidebar === 'chat' ? (
-              <div className="drawer-chat-container">
-                <div className="chat-notice-banner">
-                  <Shield size={14} className="banner-icon" />
-                  <span>Messages are only visible to people in the call and are deleted when the call ends.</span>
-                </div>
-                <div className="drawer-chat-messages">
-                  {messages.map((msg, index) => {
-                    const isOwn = msg.sender === (user?.name || guestName);
-                    const messageInitials = getInitials(msg.sender);
-                    
-                    return (
-                      <div key={index} className={'meet-chat-msg-row ' + (isOwn ? 'own' : '')}>
-                        {!isOwn ? (
-                          <div className="chat-msg-avatar" title={msg.sender}>
-                            {messageInitials}
-                          </div>
-                        ) : null}
-                        <div className="chat-msg-bubble-wrap">
-                          <div className="chat-msg-meta">
-                            <span className="chat-msg-sender">{isOwn ? 'You' : msg.sender}</span>
-                            <span className="chat-msg-time">
-                              {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <p className="meet-chat-text">{msg.message}</p>
-                        </div>
-                        {isOwn ? (
-                          <div className="chat-msg-avatar own" title="You">
-                            {messageInitials}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Empty chat placeholder container */}
-                  {/* Invisible scroll anchor at the bottom of the message list */}
-                  <div ref={chatBottomRef} />
-
-                  {messages.length === 0 ? (
-                    <div className="empty-chat-container">
-                      <div className="empty-chat-icon-wrap">
-                        <MessageSquare size={36} strokeWidth={1.5} />
-                      </div>
-                      <h4>No messages yet</h4>
-                      <p>Send a message to start the conversation with others in this call.</p>
-                    </div>
-                  ) : null}
-                </div>
-                
-                {/* Chat text box submit form */}
-                <form onSubmit={sendMessage} className="meet-chat-input-form">
-                  <input 
-                    type="text" 
-                    value={messageInput}
-                    onChange={e => setMessageInput(e.target.value)}
-                    placeholder="Send a message..."
-                  />
-                  <button type="submit" disabled={!messageInput.trim()} className="send-msg-btn" title="Send message">
-                    <Send size={18} />
-                  </button>
-                </form>
-              </div>
-            ) : (
-              // 3.2.2.2: Participant Roster view layout
-              <div className="participants-drawer-list">
-                {/* Meeting Host item row (Always first element) */}
-                <div className="participant-item">
-                  <div className="participant-item-left">
-                    <div className="participant-item-avatar">
-                      {meeting?.host?.name ? meeting.host.name[0] : 'H'}
-                    </div>
-                    <span className="participant-item-name">
-                      {meeting?.host?.name || 'Loading Host...'}
-                      <span className="participant-item-role">Host</span>
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Active attendees listing */}
-                {participants.map(pId => {
-                  const name = participantNames[pId] || ('Guest (' + pId.substring(0, 4) + ')');
-                  const isRemoteMicMuted = !!remoteMuteStates[pId]?.audio;
-                  return (
-                    <div key={pId} className="participant-item">
-                      <div className="participant-item-left">
-                        <div className="participant-item-avatar">
-                          {name[0]}
-                        </div>
-                        <span className="participant-item-name">{name}</span>
-                      </div>
-                      <div className="participant-item-status">
-                        <span className={'participant-mic-status ' + (isRemoteMicMuted ? 'muted' : '')}>
-                          {isRemoteMicMuted ? <MicOff size={18} /> : <Mic size={18} />}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* vertical pagination dots in between */}
+            {allVideoCards.length > 3 && (
+              <div className="pagination-dots">
+                <span className="dot active"></span>
+                <span className="dot"></span>
+                <span className="dot"></span>
+                <span className="dot"></span>
               </div>
             )}
+
+            {/* Bottom Row: remaining videos (centered) */}
+            {allVideoCards.length > 3 && (
+              <div className="video-row bottom-row">
+                {allVideoCards.slice(3, 6).map((card, idx) => (
+                  <div key={idx} className="redesign-video-card centered">
+                    {card.element}
+                    <div className="redesign-card-name">
+                      {card.name}
+                      {card.isMicMuted ? <span className="mic-muted-badge">🎙️ Off</span> : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
           </div>
-        ) : null}
-      </div>
 
-      {/* 3.3: FLOATING CENTER CONTROLS BAR */}
-      <div className="controls-bar">
-        {/* Toggle Audio Mute */}
-        <button 
-          className={'control-btn ' + (isMicMuted ? 'muted' : '')} 
-          onClick={toggleMic}
-          data-tooltip={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
-        >
-          {isMicMuted ? <MicOff size={20} /> : <Mic size={20} />}
-        </button>
+          {/* Sliding Right Sidebar Drawer */}
+          {activeSidebar !== null && (
+            <div className="redesign-chat-drawer">
+              <div className="drawer-header">
+                <h3>{activeSidebar === 'chat' ? 'In-call Messages' : 'Access & Invites'}</h3>
+                <button className="close-drawer-btn" onClick={() => setActiveSidebar(null)}>
+                  <X size={20} />
+                </button>
+              </div>
 
-        {/* Toggle Camera Mute */}
-        <button 
-          className={'control-btn ' + (isVideoMuted ? 'muted' : '')} 
-          onClick={toggleVideo}
-          data-tooltip={isVideoMuted ? "Turn on Camera" : "Turn off Camera"}
-        >
-          {isVideoMuted ? <VideoOff size={20} /> : <Video size={20} />}
-        </button>
+              {/* 1. Chat Drawer Content */}
+              {activeSidebar === 'chat' ? (
+                <div className="drawer-chat-container">
+                  <div className="chat-notice-banner">
+                    <Shield size={14} className="banner-icon" />
+                    <span>Messages are deleted when the call ends.</span>
+                  </div>
+                  <div className="drawer-chat-messages">
+                    {messages.map((msg, index) => {
+                      const isOwn = msg.sender === (user?.name || guestName);
+                      const messageInitials = getInitials(msg.sender);
+                      
+                      return (
+                        <div key={index} className={'meet-chat-msg-row ' + (isOwn ? 'own' : '')}>
+                          {!isOwn ? (
+                            <div className="chat-msg-avatar" title={msg.sender}>
+                              {messageInitials}
+                            </div>
+                          ) : null}
+                          <div className="chat-msg-bubble-wrap">
+                            <div className="chat-msg-meta">
+                              <span className="chat-msg-sender">{isOwn ? 'You' : msg.sender}</span>
+                              <span className="chat-msg-time">
+                                {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="meet-chat-text">{msg.message}</p>
+                          </div>
+                          {isOwn ? (
+                            <div className="chat-msg-avatar own" title="You">
+                              {messageInitials}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    <div ref={chatBottomRef} />
 
-        {/* Share Screen presentation */}
-        <button 
-          className={'control-btn ' + (isScreenSharing ? 'active' : '')} 
-          onClick={isScreenSharing ? stopScreenShare : shareScreen}
-          data-tooltip={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
-        >
-          <Monitor size={20} />
-        </button>
+                    {messages.length === 0 ? (
+                      <div className="empty-chat-container">
+                        <div className="empty-chat-icon-wrap">
+                          <MessageSquare size={36} strokeWidth={1.5} />
+                        </div>
+                        <h4>No messages yet</h4>
+                        <p>Start the conversation with others.</p>
+                      </div>
+                    ) : null}
+                  </div>
+                  
+                  <form onSubmit={sendMessage} className="meet-chat-input-form">
+                    <input 
+                      type="text" 
+                      value={messageInput}
+                      onChange={e => setMessageInput(e.target.value)}
+                      placeholder="Send a message..."
+                    />
+                    <button type="submit" disabled={!messageInput.trim()} className="send-msg-btn" title="Send message">
+                      <Send size={18} />
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                /* 2. Access Settings Drawer Content */
+                <div className="drawer-settings-container">
+                  <div className="access-options">
+                    <button 
+                      className={'access-pill ' + (meeting?.accessType === 'public' ? 'active' : '')}
+                      onClick={() => handleToggleAccessType('public')}
+                      disabled={isSavingAccess || meeting?.host?._id !== user?._id}
+                    >
+                      <span className="dot public-dot"></span>
+                      Anyone with link (Public)
+                    </button>
+                    <button 
+                      className={'access-pill ' + (meeting?.accessType === 'restricted' ? 'active' : '')}
+                      onClick={() => handleToggleAccessType('restricted')}
+                      disabled={isSavingAccess || meeting?.host?._id !== user?._id}
+                    >
+                      <span className="dot restricted-dot"></span>
+                      Only invited guests (Restricted)
+                    </button>
+                  </div>
 
-        {/* Toggle sliding Chat Drawer */}
-        <button 
-          className={'control-btn ' + (activeSidebar === 'chat' ? 'active' : '')} 
-          onClick={() => setActiveSidebar(prev => prev === 'chat' ? null : 'chat')}
-          data-tooltip="In-call Messages"
-        >
-          <MessageSquare size={20} />
-        </button>
+                  <div className="popover-share-link">
+                    <h5>Meeting Link</h5>
+                    <div className="popover-share-row">
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={window.location.origin + '/meeting/' + id} 
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                        title="Click to select all"
+                      />
+                      <button type="button" onClick={copyMeetingLink}>
+                        {copied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
 
-        {/* Toggle sliding Attendee roster drawer */}
-        <button 
-          className={'control-btn ' + (activeSidebar === 'participants' ? 'active' : '')} 
-          onClick={() => setActiveSidebar(prev => prev === 'participants' ? null : 'participants')}
-          data-tooltip="People"
-        >
-          <Users size={20} />
-        </button>
+                  <div className="invited-guests-section">
+                    <h5>Invited Guest List</h5>
+                    {meeting?.host?._id === user?._id ? (
+                      <form onSubmit={handleAddInviteEmail} className="invite-email-form">
+                        <input
+                          type="email"
+                          value={newInviteEmail}
+                          onChange={e => setNewInviteEmail(e.target.value)}
+                          placeholder="Add guest email..."
+                          disabled={isSavingAccess}
+                        />
+                        <button type="submit" disabled={isSavingAccess || !newInviteEmail.trim()}>
+                          Add
+                        </button>
+                      </form>
+                    ) : (
+                      <p className="viewer-notice">Only the host can modify the guest list.</p>
+                    )}
 
-        {/* Call end button (Host ends meeting for all vs Guest exits room) */}
-        {meeting && user && meeting.host?._id === user._id && meeting.status !== 'completed' ? (
+                    <div className="invited-emails-list">
+                      {meeting?.invitedEmails && meeting.invitedEmails.length > 0 ? (
+                        meeting.invitedEmails.map((email: string) => (
+                          <div key={email} className="email-chip">
+                            <span className="email-text" title={email}>{email}</span>
+                            {meeting?.host?._id === user?._id ? (
+                              <button 
+                                type="button" 
+                                className="remove-email-btn"
+                                onClick={() => handleRemoveInviteEmail(email)}
+                                disabled={isSavingAccess}
+                                title={'Remove ' + email}
+                              >
+                                <X size={12} />
+                              </button>
+                            ) : null}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="no-emails-placeholder">No guest invitations sent yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {isSavingAccess && (
+                    <div className="popover-loading-overlay">
+                      <div className="popover-spinner"></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Floating pill-shaped controls bar at the bottom */}
+        <div className="redesign-controls-pill">
+          {/* Screen Share */}
           <button 
-            className="control-btn danger" 
-            onClick={endMeeting}
-            data-tooltip="End Meeting for Everyone"
+            className={'control-btn ' + (isScreenSharing ? 'active' : '')} 
+            onClick={isScreenSharing ? stopScreenShare : shareScreen}
+            title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
           >
-            <PhoneOff size={20} />
+            <Monitor size={20} />
           </button>
-        ) : (
+
+          {/* Toggle Chat */}
           <button 
-            className="control-btn danger" 
-            onClick={() => navigate('/dashboard')}
-            data-tooltip="Leave Call"
+            className={'control-btn ' + (activeSidebar === 'chat' ? 'active' : '')} 
+            onClick={() => setActiveSidebar(prev => prev === 'chat' ? null : 'chat')}
+            title="In-call Messages"
           >
-            <PhoneOff size={20} />
+            <MessageSquare size={20} />
           </button>
-        )}
-      </div>
+
+          {/* Toggle Video Camera */}
+          <button 
+            className={'control-btn ' + (isVideoMuted ? 'muted' : '')} 
+            onClick={toggleVideo}
+            title={isVideoMuted ? "Turn on Camera" : "Turn off Camera"}
+          >
+            {isVideoMuted ? <VideoOff size={20} /> : <Video size={20} />}
+          </button>
+
+          {/* Toggle Microphone */}
+          <button 
+            className={'control-btn ' + (isMicMuted ? 'muted' : '')} 
+            onClick={toggleMic}
+            title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
+          >
+            {isMicMuted ? <MicOff size={20} /> : <Mic size={20} />}
+          </button>
+
+          {/* Red End Call Hangup */}
+          {meeting && user && meeting.host?._id === user._id && meeting.status !== 'completed' ? (
+            <button 
+              className="control-btn hangup" 
+              onClick={endMeeting}
+              title="End Meeting for Everyone"
+            >
+              <PhoneOff size={20} />
+            </button>
+          ) : (
+            <button 
+              className="control-btn hangup" 
+              onClick={() => navigate('/dashboard')}
+              title="Leave Call"
+            >
+              <PhoneOff size={20} />
+            </button>
+          )}
+
+          {/* Visual audio level graphics mock */}
+          <div className="audio-graphic-mock" title="Microphone Level">
+            <Volume2 size={18} />
+            <div className="audio-bars">
+              <span className="bar active"></span>
+              <span className="bar active"></span>
+              <span className="bar"></span>
+              <span className="bar"></span>
+            </div>
+          </div>
+
+          {/* Add / Invite Participant settings drawer trigger */}
+          <button 
+            className={'control-btn ' + (activeSidebar === 'settings' ? 'active' : '')} 
+            onClick={() => setActiveSidebar(prev => prev === 'settings' ? null : 'settings')}
+            title="Invite & Settings"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+      </main>
 
     </div>
   );
