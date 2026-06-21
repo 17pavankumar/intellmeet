@@ -67,6 +67,35 @@ const RemoteVideo: React.FC<RemoteVideoProps> = (props) => {
   );
 };
 
+// Sub-component to bind and render local participant video streams cleanly
+interface LocalVideoProps {
+  stream: MediaStream;
+}
+
+const LocalVideo: React.FC<LocalVideoProps> = (props) => {
+  const stream = props.stream;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Monitor stream updates and bind to video DOM element
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+    }
+  }, [stream]);
+
+  return (
+    <video 
+      ref={videoRef}
+      autoPlay 
+      muted
+      playsInline 
+      className="meet-video-stream"
+    />
+  );
+};
+
 const MeetingRoomPage: React.FC = () => {
   // Extract meeting ID from URL params
   const params = useParams<{ id: string }>();
@@ -144,7 +173,6 @@ const MeetingRoomPage: React.FC = () => {
   // References to keep persistent state values across renders without re-rendering
   const socketRef = useRef<Socket | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const peersRef = useRef<Record<string, RTCPeerConnection>>({});
   const screenStreamRef = useRef<MediaStream | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
@@ -550,19 +578,6 @@ const MeetingRoomPage: React.FC = () => {
       }
     };
   }, [id, isReadyToJoin, !!meeting, !!restrictionError, mediaRetryCount]);
-
-  // EFFECT: Bind local stream to the video element whenever stream or screen-share state changes.
-  // Using 'localStream' state (not just the ref) ensures React re-runs this effect when the
-  // camera stream becomes available — refs don't trigger re-renders so the srcObject would
-  // otherwise never be set if the video element wasn't mounted yet when getUserMedia resolved.
-  useEffect(() => {
-    if (localVideoRef.current) {
-      const activeStream = isScreenSharing ? screenStreamRef.current : localStream;
-      if (activeStream && localVideoRef.current.srcObject !== activeStream) {
-        localVideoRef.current.srcObject = activeStream;
-      }
-    }
-  }, [isScreenSharing, isReadyToJoin, localStream]);
 
   // Helper method: builds new RTCPeerConnection object and hooks events
   const createPeerConnection = (socketId: string, isInitiator: boolean) => {
@@ -1004,41 +1019,40 @@ const MeetingRoomPage: React.FC = () => {
 
   // VIEW 3: Main video call conference room layout (Redesigned)
   
+  // Check if local video stream is available and active
+  const hasLocalVideo = (isScreenSharing && screenStreamRef.current && screenStreamRef.current.getVideoTracks().length > 0) ||
+                        (!isScreenSharing && localStream && localStream.getVideoTracks().length > 0 && !isVideoMuted);
+
   // Assemble all video card structures (including local user and remote participants)
   const allVideoCards = [
     {
       id: 'local',
       name: `${user?.name || guestName} (You)`,
       isMicMuted: isMicMuted,
-      element: isVideoMuted ? (
+      element: hasLocalVideo ? (
+        <LocalVideo stream={isScreenSharing ? screenStreamRef.current! : localStream!} />
+      ) : (
         <div className="redesign-avatar-placeholder">
           <div className="redesign-avatar-circle">{getLocalInitials()}</div>
         </div>
-      ) : (
-        <video 
-          ref={localVideoRef}
-          autoPlay 
-          muted 
-          playsInline 
-          className="meet-video-stream"
-        />
       )
     },
     ...participants.map(pId => {
       const isRemoteVideoMuted = !!remoteMuteStates[pId]?.video;
       const isRemoteMicMuted = !!remoteMuteStates[pId]?.audio;
       const remoteName = participantNames[pId] || (`Guest (${pId.substring(0, 4)})`);
+      const hasRemoteVideo = remoteStreams[pId] && remoteStreams[pId].getVideoTracks().length > 0 && !isRemoteVideoMuted;
       return {
         id: pId,
         name: remoteName,
         isMicMuted: isRemoteMicMuted,
-        element: isRemoteVideoMuted ? (
-          <div className="redesign-avatar-placeholder">
-            <div className="redesign-avatar-circle">{getParticipantInitials(pId)}</div>
-          </div>
+        element: hasRemoteVideo ? (
+          <RemoteVideo stream={remoteStreams[pId]} />
         ) : (
           remoteStreams[pId] ? (
-            <RemoteVideo stream={remoteStreams[pId]} />
+            <div className="redesign-avatar-placeholder">
+              <div className="redesign-avatar-circle">{getParticipantInitials(pId)}</div>
+            </div>
           ) : (
             <div className="redesign-video-connecting">
               <div className="redesign-spinner"></div>
