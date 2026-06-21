@@ -84,13 +84,9 @@ jobs:
         if: matrix.component == 'backend'
         working-directory: backend
         run: |
-          node -c server.js
-          node -c src/controllers/meetingController.js
-          node -c src/controllers/authController.js
-          node -c src/controllers/taskController.js
-          node -c src/sockets/meetingSocket.js
-          node -c src/services/aiService.js
-          node -c src/middleware/authMiddleware.js
+          find . -name "*.js" -not -path "*/node_modules/*" | while read -r file; do
+            node -c "$file"
+          done
           echo "✅ All backend files passed syntax check"
 
 # ============================================================
@@ -119,8 +115,8 @@ jobs:
             --request POST \
             "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
 
-          # Check if Render accepted the request (201 = deployment triggered)
-          if [ "$response" = "201" ]; then
+          # Check if Render accepted the request (200 or 201 = deployment triggered)
+          if [ "$response" = "200" ] || [ "$response" = "201" ]; then
             echo "✅ Render deployment triggered successfully (HTTP $response)"
           else
             echo "❌ Render deployment trigger failed (HTTP $response)"
@@ -130,14 +126,20 @@ jobs:
       # Step 2: Wait briefly and check if the backend API responds
       - name: Wait for Backend to Start
         run: |
+          app_url="${{ secrets.RENDER_APP_URL }}"
+          if [ -z "$app_url" ]; then
+            echo "⚠️ RENDER_APP_URL secret is not set. Skipping live health check."
+            exit 0
+          fi
+
           echo "⏳ Waiting 30 seconds for Render to start the server..."
           sleep 30
-          echo "🔍 Checking backend health..."
+          echo "🔍 Checking backend health at $app_url ..."
           # Poll the backend root endpoint up to 5 times
           for i in 1 2 3 4 5; do
             response=$(curl -s -o /dev/null -w "%{http_code}" \
               --max-time 10 \
-              https://intellmeet-api.onrender.com/ || echo "000")
+              "$app_url" || echo "000")
             echo "  Attempt $i: HTTP $response"
             if [ "$response" = "200" ]; then
               echo "✅ Backend is live and responding!"
@@ -181,35 +183,31 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # Step 4: Install Vercel CLI globally so we can run 'vercel' commands
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      # Step 5: Pull Vercel project settings (vercel.json config, env vars etc.)
+      # Step 4: Pull Vercel project settings (vercel.json config, env vars etc.)
       # Uses secrets stored in GitHub to authenticate with Vercel
       - name: Pull Vercel Project Settings
         working-directory: frontend
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      # Step 6: Build the Vite app specifically for Vercel's production environment
+      # Step 5: Build the Vite app specifically for Vercel's production environment
       # Vercel injects the env variables set in the Vercel dashboard
       - name: Build for Production (Vercel)
         working-directory: frontend
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      # Step 7: Deploy the built files to Vercel's global CDN
-      # --prebuilt means we skip re-building (already done in step 6)
+      # Step 6: Deploy the built files to Vercel's global CDN
+      # --prebuilt means we skip re-building (already done in step 5)
       - name: Deploy to Vercel Production
         working-directory: frontend
         run: |
           echo "🚀 Deploying frontend to Vercel..."
-          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
           echo "✅ Frontend deployed successfully!"
           echo "🌐 Live URL: $url"
         env:
