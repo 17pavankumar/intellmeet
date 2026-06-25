@@ -1,93 +1,95 @@
-/* Create Meeting Dialog Styling — Premium Light Theme */
+/* ============================================================
+   Create Meeting Modal — IntellMeet Dark Premium Theme
+   ============================================================ */
 
 .modal-backdrop {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.25s ease-out forwards;
+  padding: 1.5rem;
 }
 
 .modal-box {
-  background: #FFFFFF;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  width: 92%;
+  width: 100%;
   max-width: 520px;
-  box-shadow: 
-    0 32px 80px -24px rgba(15, 23, 42, 0.15),
-    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(124, 58, 237, 0.1);
   overflow: hidden;
   position: relative;
   animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Reflective Top Highlight */
+/* Top accent line */
 .modal-box::before {
   content: '';
   position: absolute;
-  top: 0; left: 10%; right: 10%; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary), transparent);
+  top: 0; left: 15%; right: 15%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.7), rgba(6, 182, 212, 0.4), transparent);
 }
 
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(24px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .modal-header {
   padding: 1.75rem 2.25rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(15, 23, 42, 0.01);
+  background: rgba(124, 58, 237, 0.03);
 }
 
 .modal-title {
   margin: 0;
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 1.35rem;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 .close-btn {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: var(--radius-xs);
 }
 
 .close-btn:hover {
   color: var(--text-primary);
-  background: rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-light);
 }
 
 .modal-form {
   padding: 2.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.5rem;
 }
 
 .form-group {
@@ -98,54 +100,60 @@
 
 .form-group label {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.825rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
 }
 
 .form-group input,
 .form-group textarea {
-  background: #FFFFFF;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  padding: 0.85rem 1.1rem;
+  padding: 0.875rem 1.1rem;
   color: var(--text-primary);
   font-size: 0.95rem;
   outline: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.form-group input:hover,
-.form-group textarea:hover {
-  border-color: rgba(15, 23, 42, 0.22);
-  background: #FFFFFF;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05);
-  background: #FFFFFF;
+  width: 100%;
 }
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-muted);
+}
+
+.form-group input:hover,
+.form-group textarea:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-medium);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  background: rgba(124, 58, 237, 0.04);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 90px;
 }
 
 .modal-footer {
   padding-top: 1.25rem;
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
+  gap: 0.85rem;
 }
 
 .cancel-btn {
   padding: 0.8rem 1.75rem;
   background: transparent;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-family: 'Plus Jakarta Sans', sans-serif;
@@ -156,39 +164,33 @@
 }
 
 .cancel-btn:hover {
-  background: rgba(15, 23, 42, 0.03);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
-  border-color: rgba(15, 23, 42, 0.22);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cancel-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .submit-btn {
   padding: 0.8rem 2rem;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+  background: var(--gradient-primary);
   border: none;
   border-radius: var(--radius-md);
   color: #FFFFFF;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
-  position: relative;
-}
-
-.submit-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border: 1px solid rgba(255,255,255,0.1);
-  pointer-events: none;
+  box-shadow: var(--shadow-purple);
 }
 
 .submit-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, #1E293B, #0F172A);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.15);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-purple-lg);
 }
 
 .submit-btn:disabled {
@@ -197,25 +199,18 @@
   box-shadow: none;
 }
 
-/* ---- Inline Error Banner ---- */
-/* Shown inside the form when meeting creation fails (e.g., not logged in, server error) */
 .form-error-banner {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: 10px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
   padding: 0.85rem 1rem;
-  color: #dc2626;
+  color: #FCA5A5;
   font-size: 0.875rem;
   line-height: 1.5;
   animation: slideUp 0.2s ease-out forwards;
-}
-
-.cancel-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 @media (max-height: 600px) {
@@ -224,18 +219,10 @@
     display: flex;
     flex-direction: column;
   }
-  .modal-form {
-    overflow-y: auto;
-    padding: 1.5rem;
-  }
+  .modal-form { overflow-y: auto; padding: 1.5rem; }
 }
 
 @media (max-width: 480px) {
-  .modal-header {
-    padding: 1.25rem 1.5rem;
-  }
-  .modal-form {
-    padding: 1.5rem;
-    gap: 1.25rem;
-  }
+  .modal-header { padding: 1.25rem 1.5rem; }
+  .modal-form   { padding: 1.5rem; gap: 1.25rem; }
 }

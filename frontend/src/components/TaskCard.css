@@ -1,57 +1,55 @@
-/* Modern Task Card Styling — Premium Light Theme */
+/* ============================================================
+   Task Card — IntellMeet Dark Premium Theme
+   ============================================================ */
 
 .task-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--bg-surface-3);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 1.35rem 1.6rem;
+  padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.8rem;
   box-shadow: var(--shadow-sm);
   position: relative;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
 }
 
-.task-card::before {
+/* Hover accent glow */
+.task-card::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 1px solid transparent;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.08)) border-box;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: destination-out;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0.6;
+  background: radial-gradient(ellipse at top left, rgba(124, 58, 237, 0.06) 0%, transparent 70%);
+  opacity: 0;
   transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .task-card:hover {
   transform: translateY(-3px);
-  box-shadow: 
-    0 16px 36px rgba(15, 23, 42, 0.04),
-    0 0 20px rgba(15, 23, 42, 0.01);
-  border-color: rgba(15, 23, 42, 0.15);
+  border-color: rgba(124, 58, 237, 0.2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(124, 58, 237, 0.08);
 }
 
-.task-card:hover::before {
+.task-card:hover::after {
   opacity: 1;
 }
 
 .task-title {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 1.1rem;
-  font-weight: 750;
+  font-size: 1rem;
+  font-weight: 800;
   color: var(--text-primary);
   margin: 0;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
 }
 
 .task-desc {
-  font-size: 0.925rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
@@ -61,78 +59,77 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 0.85rem;
+  margin-top: 0.5rem;
   padding-top: 0.85rem;
-  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  border-top: 1px solid var(--border-subtle);
 }
 
-/* Custom Status Dropdown Menu */
 .task-status-select {
-  background: #FFFFFF;
-  color: var(--text-primary);
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  padding: 0.45rem 0.85rem;
-  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-xs);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.825rem;
+  font-size: 0.8rem;
   font-weight: 700;
   outline: none;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
 }
 
 .task-status-select:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05);
-  background: #FFFFFF;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  color: var(--text-primary);
 }
 
 .task-status-select option {
-  background: #FFFFFF;
+  background: var(--bg-surface-2);
   color: var(--text-primary);
   font-weight: 600;
 }
 
 .delete-btn {
-  padding: 0.45rem 1rem;
+  padding: 0.4rem 0.85rem;
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
-  border-radius: var(--radius-sm);
-  color: var(--danger);
+  border-radius: var(--radius-xs);
+  color: #FCA5A5;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
 }
 
 .delete-btn:hover {
-  background: var(--danger);
-  color: white;
-  border-color: var(--danger);
-  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.15);
+  background: rgba(239, 68, 68, 0.15);
+  color: #FCA5A5;
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
 }
 
-/* Assignee styling */
 .task-assignee {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.825rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
-  background: rgba(15, 23, 42, 0.03);
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-sm);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-xs);
   width: fit-content;
 }
 
 .assignee-label {
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   opacity: 0.8;
 }
 
 .assignee-name {
   font-weight: 700;
-  color: var(--text-primary);
+  color: #C4B5FD;
 }

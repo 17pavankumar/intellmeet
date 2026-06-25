@@ -1,8 +1,10 @@
-/* Kanban Board Layout Refinement — Premium Light Theme */
+/* ============================================================
+   Kanban Board — IntellMeet Dark Premium Theme
+   ============================================================ */
 
 .kanban-board {
   display: flex;
-  gap: 1.75rem;
+  gap: 1.5rem;
   margin-top: 1rem;
   overflow-x: auto;
   padding-bottom: 1.5rem;
@@ -12,83 +14,88 @@
 
 .kanban-column {
   flex: 1;
-  min-width: 320px;
-  background: #F8FAFC;
+  min-width: 300px;
+  background: var(--bg-surface-2);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  box-shadow: 
-    0 12px 36px rgba(15, 23, 42, 0.02),
-    inset 0 4px 20px rgba(15, 23, 42, 0.01);
+  box-shadow: var(--shadow-md);
   position: relative;
   overflow: hidden;
 }
 
-/* Kanban Headers */
-.kanban-header {
-  padding: 1.5rem 1.75rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  background: rgba(15, 23, 42, 0.01);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  position: relative;
-}
-
-/* Top Indicator Stripes based on status */
+/* Colored top status bars */
 .kanban-column::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; height: 3px;
 }
 
-.todo-col::before { background: var(--status-todo); }
-.in-progress-col::before { background: var(--status-progress); }
-.done-col::before { background: var(--status-done); }
+.todo-col::before {
+  background: linear-gradient(90deg, #EF4444, #F87171);
+}
+
+.in-progress-col::before {
+  background: linear-gradient(90deg, #F59E0B, #FCD34D);
+}
+
+.done-col::before {
+  background: linear-gradient(90deg, #10B981, #34D399);
+}
+
+.kanban-header {
+  padding: 1.5rem 1.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.015);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
 
 .kanban-header h3 {
   margin: 0;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  font-weight: 800;
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 
-.todo-col h3 { color: var(--status-todo); }
-.in-progress-col h3 { color: var(--status-progress); }
-.done-col h3 { color: var(--status-done); }
+.todo-col h3        { color: #F87171; }
+.in-progress-col h3 { color: #FCD34D; }
+.done-col h3        { color: #34D399; }
 
 .kanban-header h3 span {
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  padding: 0.2rem 0.65rem;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  padding: 0.2rem 0.6rem;
+  border-radius: 99px;
   font-family: 'Inter', sans-serif;
-  font-size: 0.725rem;
-  color: var(--text-primary);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
 .kanban-list {
-  padding: 1.5rem;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   overflow-y: auto;
   flex: 1;
 }
 
 .kanban-empty {
-  color: var(--text-tertiary);
+  color: var(--text-muted);
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   margin-top: 1.5rem;
   padding: 2rem;
-  background: rgba(15, 23, 42, 0.01);
-  border: 1px dashed rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-lg);
   font-weight: 500;
+  font-style: italic;
 }

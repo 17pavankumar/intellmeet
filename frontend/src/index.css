@@ -1,51 +1,78 @@
-/* Global Reset & Base Styles — Premium Light Theme */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Global Reset & Base Styles — IntellMeet Dark Premium Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 
 :root {
-  /* ── Premium Light Theme (White & Deep Slate) ── */
-  --bg-main: #FFFFFF;          /* Pure white background */
-  --bg-surface: #F8FAFC;       /* Slate 50 — clean light surface */
-  --bg-surface-hover: #F1F5F9; /* Slate 100 — hover state */
-  --bg-card: rgba(248, 250, 252, 0.85);
-  --bg-glass: rgba(255, 255, 255, 0.75);
+  /* ── Dark Background System ── */
+  --bg-main: #0A0A0F;
+  --bg-surface: #111118;
+  --bg-surface-2: #16161E;
+  --bg-surface-3: #1C1C26;
+  --bg-card: rgba(22, 22, 30, 0.8);
+  --bg-glass: rgba(255, 255, 255, 0.04);
 
-  --text-primary: #0F172A;     /* Slate 900 — crisp slate-black for high contrast readability */
-  --text-secondary: #475569;   /* Slate 600 — elegant secondary text */
-  --text-tertiary: #64748B;    /* Slate 500 — clear auxiliary text */
+  /* ── Text Hierarchy ── */
+  --text-primary: #F0F0FF;
+  --text-secondary: #A0A0C0;
+  --text-tertiary: #6060A0;
+  --text-muted: #40405A;
 
-  /* Dark Slate & Silver Accents */
-  --accent-primary: #0F172A;       /* Deep slate-black */
-  --accent-primary-hover: #1E293B; /* Slightly lighter deep slate */
-  --accent-secondary: #334155;     /* Slate 700 */
-  --accent-glow: rgba(15, 23, 42, 0.05);
+  /* ── Vibrant Accent Palette ── */
+  --accent-purple: #7C3AED;
+  --accent-purple-light: #8B5CF6;
+  --accent-violet: #6D28D9;
+  --accent-indigo: #4F46E5;
+  --accent-cyan: #06B6D4;
+  --accent-pink: #EC4899;
+  --accent-emerald: #10B981;
+  --accent-amber: #F59E0B;
 
-  /* Status Colors */
-  --status-todo: #EF4444;     /* Crisp Red */
-  --status-progress: #F59E0B; /* Crisp Amber */
-  --status-done: #10B981;     /* Crisp Emerald */
+  /* Primary action color */
+  --accent-primary: #7C3AED;
+  --accent-primary-hover: #6D28D9;
+  --accent-primary-glow: rgba(124, 58, 237, 0.35);
 
-  --danger: #DC2626;
-  --danger-hover: #B91C1C;
-  --danger-bg: rgba(220, 38, 38, 0.05);
-  --danger-border: rgba(220, 38, 38, 0.15);
+  /* ── Gradient Definitions ── */
+  --gradient-primary: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%);
+  --gradient-hero: linear-gradient(135deg, #1a0533 0%, #0c1445 50%, #050d2e 100%);
+  --gradient-card: linear-gradient(145deg, rgba(124, 58, 237, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%);
+  --gradient-cyan: linear-gradient(135deg, #06B6D4 0%, #4F46E5 100%);
 
-  /* Precise Borders & Glass Outlines */
-  --border-light: rgba(15, 23, 42, 0.06);
-  --border-glass: rgba(15, 23, 42, 0.08);
-  --border-focus: rgba(15, 23, 42, 0.25);
+  /* ── Status Colors ── */
+  --status-todo: #EF4444;
+  --status-progress: #F59E0B;
+  --status-done: #10B981;
 
-  /* Radius Grid */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 26px;
+  --danger: #EF4444;
+  --danger-hover: #DC2626;
+  --danger-bg: rgba(239, 68, 68, 0.08);
+  --danger-border: rgba(239, 68, 68, 0.2);
 
-  /* Premium Elevation & Soft Shadows */
-  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 8px 30px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.08);
-  --shadow-glass: 0 8px 32px 0 rgba(15, 23, 42, 0.06);
-  --shadow-glow: 0 0 30px var(--accent-glow);
+  --success: #10B981;
+  --success-bg: rgba(16, 185, 129, 0.08);
+  --success-border: rgba(16, 185, 129, 0.2);
+
+  /* ── Borders ── */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-accent: rgba(124, 58, 237, 0.4);
+  --border-focus: rgba(124, 58, 237, 0.6);
+
+  /* ── Radius Grid ── */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+  --shadow-purple: 0 8px 32px rgba(124, 58, 237, 0.25);
+  --shadow-purple-lg: 0 20px 60px rgba(124, 58, 237, 0.3);
+  --shadow-glow: 0 0 40px rgba(124, 58, 237, 0.2);
 }
 
 *, *::before, *::after {
@@ -91,8 +118,8 @@ input, textarea, select {
 
 /* Ultra-Thin Modern Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -100,10 +127,10 @@ input, textarea, select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.1);
+  background: rgba(124, 58, 237, 0.3);
   border-radius: 99px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.2);
+  background: rgba(124, 58, 237, 0.5);
 }
